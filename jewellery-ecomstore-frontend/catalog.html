@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Luxury Boutique - Catalog</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <style>
+    /* ----- Navigation ----- */
+    .nav.site-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 24px;
+      background-color: #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .nav-left {
+      display: flex;
+      gap: 20px;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: #333;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 20px;
+      /* keep ASHADI size */
+      color: #d4af37;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Search icon */
+    .nav-search-icon {
+      width: 24px;
+      height: 24px;
+      cursor: pointer;
+      transition: filter 0.3s ease;
+    }
+
+    .nav-search-icon:hover {
+      filter: brightness(1.2);
+    }
+
+    /* Search input (hidden by default) */
+    .nav-search-bar {
+      width: 180px;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      display: inline-block;
+      /* visible by default */
+    }
+
+    /* Cart icon */
+    .nav-cart {
+      width: 30px;
+      height: 30px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <nav class="nav site-nav">
+      <div class="nav-left">
+        <a href="index.html" class="nav-link" aria-label="Go home">Home</a>
+      </div>
+      <a href="index.html" class="brand" aria-label="Go home">ASHADI</a>
+
+      <div class="nav-right">
+        <input type="text" placeholder="Search..." class="nav-search-bar" />
+        <img src="images/cart.png" alt="Cart" class="cart-icon" id="cartIcon" />
+      </div>
+    </nav>
+  </header>
+
+  <main class="catalog-page">
+    <section class="product-grid">
+      <!-- Standardised product card markup - repeatable -->
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_1.png" alt="Golden Elegance Necklace" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Golden Elegance Necklace</span>
+              <span class="overlay-price">Rs.40,000</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_2.png" alt="Diamond Ring" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Diamond Ring</span>
+              <span class="overlay-price">$950</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_3.png" alt="Pearl Earrings" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Pearl Earrings</span>
+              <span class="overlay-price">$780</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_4.png" alt="Luxury Bracelet" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Luxury Bracelet</span>
+              <span class="overlay-price">$1,100</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_3.png" alt="Rose Gold Pendant" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Rose Gold Pendant</span>
+              <span class="overlay-price">$1,250</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <div class="product-card">
+        <a href="product.html" class="product-link" aria-label="View product">
+          <div class="image-wrap">
+            <img src="images/necklace_1.png" alt="Sapphire Ring" />
+            <div class="overlay" aria-hidden="true">
+              <span class="overlay-name">Sapphire Ring</span>
+              <span class="overlay-price">$950</span>
+            </div>
+          </div>
+        </a>
+      </div>
+
+      <!-- Add the remaining products here exactly like above -->
+    </section>
+  </main>
+
+  <!-- Cart Slide-out -->
+  <div class="cart-overlay" id="cartOverlay"></div>
+  <div class="cart-slide" id="cartSlide">
+    <div class="cart-header">
+      <h3>Shopping Cart</h3>
+      <button class="cart-close" id="cartClose">&times;</button>
+    </div>
+    <div class="cart-items" id="cartItems">
+      <!-- Cart items will be added here dynamically -->
+    </div>
+    <div class="cart-footer">
+      <div class="cart-total" id="cartTotal">Total: $0</div>
+      <button class="cart-checkout-btn" id="cartCheckoutBtn">Checkout</button>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-bottom">
+      <p>© 2025 Luxury Boutique. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/script.js"></script>
+  <script src="js/catalog.js"></script>
+  <script>
+    // Optional click-to-expand search (only if icon exists)
+    const searchIcon = document.querySelector('.nav-search-icon');
+    const searchInput = document.querySelector('.nav-search-bar');
+    if (searchIcon && searchInput) {
+      searchIcon.addEventListener('click', () => {
+        searchIcon.style.display = 'none';
+        searchInput.style.display = 'block';
+        searchInput.focus();
+      });
+    }
+  </script>
+</body>
+
+</html>

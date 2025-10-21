@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Luxury Boutique - Product</title>
+    <link rel="stylesheet" href="css/styles.css" />
+</head>
+
+<body>
+
+    <header class="site-header" id="siteHeader">
+        <nav class="nav site-nav">
+            <div class="nav-left">
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="catalog.html" class="nav-link">Catalog</a>
+            </div>
+            <a href="index.html" class="brand">ASHADI</a>
+            <div class="nav-right">
+                <img src="images/cart.png" alt="Cart" class="cart-icon" id="cartIcon" />
+            </div>
+        </nav>
+    </header>
+
+    <main class="product-page">
+        <section class="product-display">
+            <div class="product-images">
+                <img src="images/necklace_1.png" alt="Luxury Necklace" class="main-image" />
+            </div>
+            <div class="product-info">
+                <h1 class="product-title">Golden Elegance Necklace</h1>
+                <p class="product-price">LKR 40 000</p>
+                <p class="product-description">
+                    Handcrafted in 18K gold with dazzling diamonds, this necklace embodies timeless luxury.
+                </p>
+                <div style="display:flex; gap:12px;">
+                    <button class="btn-add-cart add-to-cart-btn" data-product="Golden Elegance Necklace"
+                        data-price="40000">ADD TO CART</button>
+                </div>
+            </div>
+
+            <!-- moved review section: now takes full width under image + info -->
+            <section id="review-section">
+                <h3>Customer reviews</h3>
+                <ul id="review-list" style="list-style:none;padding:0;margin:0 0 12px 0">
+                    <li>No reviews yet — be the first to review!</li>
+                </ul>
+
+                <form id="review-form">
+                    <h4>Add your review</h4>
+                    <label>
+                        Rating:
+                        <select id="review-rating" aria-label="rating">
+                            <option value="5">5</option>
+                            <option value="4">4</option>
+                            <option value="3">3</option>
+                            <option value="2">2</option>
+                            <option value="1">1</option>
+                        </select>
+                    </label>
+                    <div style="margin-top:8px;">
+                        <textarea id="review-comment" placeholder="Write a short review..." rows="4"></textarea>
+                    </div>
+                    <div id="review-error" style="color:crimson;margin-top:8px;display:none;"></div>
+                    <button type="submit" id="review-submit" class="btn-review" style="margin-top:8px;">Submit
+                        review</button>
+                </form>
+            </section>
+        </section>
+    </main>
+
+    <!-- Cart Slide-out -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-slide" id="cartSlide">
+        <div class="cart-header">
+            <h3>Shopping Cart</h3>
+            <button class="cart-close" id="cartClose">&times;</button>
+        </div>
+        <div class="cart-items" id="cartItems">
+            <!-- Cart items will be added here dynamically -->
+        </div>
+        <div class="cart-footer">
+            <div class="cart-total" id="cartTotal">Total: $0</div>
+            <button class="cart-checkout-btn" id="cartCheckoutBtn">Checkout</button>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <div class="footer-brand">
+                <h3>Luxury Boutique</h3>
+                <p>Timeless jewellery, crafted with elegance.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Explore</h4>
+                <ul>
+                    <li><a href="#">Shop</a></li>
+                    <li><a href="#">About</a></li>
+                    <li><a href="#">Contact</a></li>
+                    <li><a href="#">FAQs</a></li>
+                </ul>
+            </div>
+            <div class="footer-contact">
+                <h4>Contact</h4>
+                <p>support@luxuryboutique.com</p>
+                <p>+94 71 234 5678</p>
+            </div>
+            <div class="footer-social">
+                <h4>Follow Us</h4>
+                <p><a href="#">Facebook</a> | <a href="#">Instagram</a> | <a href="#">Twitter</a></p>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>© 2025 Luxury Boutique. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/script.js"></script>
+    <script src="js/product.js"></script>
+</body>
+
+</html>
