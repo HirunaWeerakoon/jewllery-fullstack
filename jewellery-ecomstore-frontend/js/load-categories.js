@@ -2,8 +2,7 @@
     const rail = document.querySelector('.category-rail');
     if (!rail) return;
 
-    // If you later add a backend, set window.API_BASE_URL = 'http://localhost:8080/api' before this script
-    const baseUrl = 'http://localhost:8080/api' || '';
+    const baseUrl = API_BASE_URL || '';
 
     function render(categories) {
         rail.innerHTML = '';

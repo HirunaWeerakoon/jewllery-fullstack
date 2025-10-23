@@ -9,9 +9,9 @@ class CatalogManager {
         this.selectedCategory = null;
         this.searchTerm = '';
 
-        // API Configuration - Update these URLs to match your backend
+ 
         this.apiConfig = {
-            baseUrl: 'http://localhost:8080/api', // Update with your backend URL
+            baseUrl: API_BASE_URL, 
             endpoints: {
                 products: '/products',
                 categories: '/categories',

@@ -1,17 +1,61 @@
-// Simple admin: products and categories management (localStorage fallback)
+// jewellery-ecomstore-frontend/js/admin.js
+// Refactored to use backend API instead of localStorage
 
 (function () {
-    const PRODUCTS_KEY = 'local-products';
-    const CATEGORIES_KEY = 'local-categories';
+    // --- Authentication Helper ---
+    // Implement this function based on how you store the token after login
+    function getAuthToken() {
+        return localStorage.getItem('adminToken'); // Example: Retrieve token saved during login
+    }
+
+    // --- API Helper ---
+    async function apiRequest(endpoint, options = {}) {
+        const token = getAuthToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                ...options,
+                headers: headers,
+            });
+
+            if (!response.ok) {
+                let errorData;
+                try {
+                    errorData = await response.json();
+                } catch (e) {
+                    errorData = { message: `HTTP error! status: ${response.status}` };
+                }
+                console.error('API Error:', errorData);
+                throw new Error(errorData.message || `Request failed with status ${response.status}`);
+            }
+
+            // Handle responses that might not have a body (e.g., DELETE with 204 No Content)
+            if (response.status === 204) {
+                return null; // Or return an empty object/true if preferred
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error('API Request Failed:', error);
+            throw error; // Re-throw the error to be handled by the caller
+        }
+    }
+
 
     // --- helpers ---
     function el(id) { return document.getElementById(id); }
-    function safeParse(raw) {
-        try { return raw ? JSON.parse(raw) : []; } catch { return []; }
+    function escapeHtml(str) {
+        return String(str || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
     }
-    function loadLocal(key) { return safeParse(localStorage.getItem(key)); }
-    function saveLocal(key, arr) { localStorage.setItem(key, JSON.stringify(arr)); }
 
+    // --- Image Conversion (Keep for form handling if sending data URLs) ---
     function fileToDataURL(file) {
         return new Promise((resolve, reject) => {
             if (!file) return resolve('');
@@ -22,448 +66,440 @@
         });
     }
 
-    /* --- helper: resize/compress image file to dataURL --- */
-    function resizeImageFileToDataURL(file, maxWidth = 1000, maxHeight = 1000, quality = 0.7) {
-        return new Promise((resolve, reject) => {
-            if (!file) return resolve('');
-            const img = new Image();
-            const reader = new FileReader();
-            reader.onerror = reject;
-            reader.onload = () => {
-                img.onload = () => {
-                    // calculate new size keeping aspect ratio
-                    let w = img.width, h = img.height;
-                    const ratio = Math.min(1, maxWidth / w, maxHeight / h);
-                    w = Math.round(w * ratio);
-                    h = Math.round(h * ratio);
-                    const canvas = document.createElement('canvas');
-                    canvas.width = w;
-                    canvas.height = h;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, w, h);
-                    try {
-                        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-                        resolve(dataUrl);
-                    } catch (err) {
-                        reject(err);
-                    }
-                };
-                img.onerror = reject;
-                img.src = reader.result;
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    /* --- choose conversion strategy for a file: small -> full dataURL, large -> resized/compressed --- */
-    async function convertFileForStorage(file) {
-        if (!file) return '';
-        // threshold in bytes (200 KB)
-        const THRESHOLD = 200 * 1024;
-        try {
-            if (file.size > THRESHOLD) {
-                // resize/compress
-                return await resizeImageFileToDataURL(file, 1000, 1000, 0.7);
-            } else {
-                // small file: plain dataURL
-                return await fileToDataURL(file);
-            }
-        } catch (err) {
-            console.warn('convertFileForStorage failed, falling back to raw dataURL', err);
-            try { return await fileToDataURL(file); } catch (e) { return ''; }
-        }
-    }
-
-    /* --- safe localStorage save with quota handling --- */
-    function safeSaveLocal(key, arr) {
-        try {
-            localStorage.setItem(key, JSON.stringify(arr));
-            return true;
-        } catch (err) {
-            if (err && err.name === 'QuotaExceededError') {
-                console.warn('QuotaExceededError saving', key);
-                // attempt to free up space: remove half of oldest items for products/categories
-                try {
-                    const other = key === 'local-products' ? 'local-categories' : 'local-products';
-                    const existing = safeParse(localStorage.getItem(key));
-                    if (Array.isArray(existing) && existing.length > 2) {
-                        const keep = existing.slice(0, Math.max(1, Math.floor(existing.length / 2)));
-                        localStorage.setItem(key, JSON.stringify(keep));
-                        // try again
-                        localStorage.setItem(key, JSON.stringify(arr));
-                        return true;
-                    }
-                    // if cannot free, notify user
-                } catch (e) { /* ignore */ }
-            }
-            alert('Failed to save locally: storage quota exceeded. Clear some items in Admin or use smaller images.');
-            return false;
-        }
-    }
-
-    // --- tabs ---
-    const tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+    // --- Tabs ---
+    const tabButtons = Array.from(document.querySelectorAll('.tab-link'));
     tabButtons.forEach(btn => btn.addEventListener('click', () => {
         tabButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         const tab = btn.dataset.tab;
-        document.querySelectorAll('.tab-panel').forEach(p => {
-            p.style.display = (p.id === 'tab-' + tab) ? '' : 'none';
+        document.querySelectorAll('.admin-tab').forEach(p => {
+            p.style.display = (p.id === tab) ? '' : 'none'; // Use id directly
         });
+        // Load data for the activated tab
+        if (tab === 'products') loadAndRenderProducts();
+        else if (tab === 'categories') loadAndRenderCategories();
+        else if (tab === 'slips') loadAndRenderSlips();
     }));
 
-    // --- renderers ---
-    function renderProductsList() {
+    // --- Renderers ---
+
+    // Products
+    async function loadAndRenderProducts() {
         const container = el('productsList');
         if (!container) return;
-        const arr = loadLocal(PRODUCTS_KEY);
-        container.innerHTML = '';
-        if (!arr.length) { container.innerHTML = '<div style="color:#666">No products.</div>'; return; }
-        arr.forEach(p => {
-            const item = document.createElement('div');
-            item.className = 'admin-item';
-            item.innerHTML = `
-        <img src="${p.image || 'images/placeholder.png'}" alt="" />
-        <div class="meta">
-          <div style="font-weight:700">${escapeHtml(p.title)}</div>
-          <div style="color:#777">LKR ${Number(p.price).toLocaleString()}</div>
-        </div>
-        <div class="actions">
-          <button class="btn-small btn-delete">Delete</button>
-        </div>
-      `;
-            item.querySelector('.btn-delete').addEventListener('click', () => {
-                const keep = loadLocal(PRODUCTS_KEY).filter(x => x.id !== p.id);
-                saveLocal(PRODUCTS_KEY, keep);
-                renderProductsList();
-            });
-            container.appendChild(item);
-        });
-    }
-
-    function renderCategoriesList() {
-        const container = el('categoriesList');
-        if (!container) return;
-        const arr = loadLocal(CATEGORIES_KEY);
-        container.innerHTML = '';
-        if (!arr.length) { container.innerHTML = '<div style="color:#666">No categories.</div>'; return; }
-        arr.forEach(c => {
-            const item = document.createElement('div');
-            item.className = 'admin-item';
-            item.innerHTML = `
-        <img src="${c.image || 'images/placeholder.png'}" alt="" />
-        <div class="meta">
-          <div style="font-weight:700">${escapeHtml(c.name)}</div>
-        </div>
-        <div class="actions">
-          <button class="btn-small btn-delete">Delete</button>
-        </div>
-      `;
-            item.querySelector('.btn-delete').addEventListener('click', () => {
-                const keep = loadLocal(CATEGORIES_KEY).filter(x => x.id !== c.id);
-                saveLocal(CATEGORIES_KEY, keep);
-                renderCategoriesList();
-                window.dispatchEvent(new Event('localCategoriesUpdated'));
-            });
-            container.appendChild(item);
-        });
-    }
-
-    // small helper to avoid XSS when injecting text
-    function escapeHtml(str) {
-        return String(str || '').replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-    }
-
-    // --- product form (file -> dataURL + submit) ---
-    {
-        // replace existing addProductForm submit handler with this robust version
-        const addProductForm = el('addProductForm');
-        if (addProductForm) {
-            addProductForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                try {
-                    console.log('[admin] addProductForm submit');
-
-                    const titleEl = el('prod-title');
-                    const priceEl = el('prod-price');
-                    const descEl = el('prod-desc');
-                    const catSel = el('prod-category');
-                    const imageInput = el('prod-image'); // from earlier code
-                    const fileInput = el('prod-image-file'); // from earlier code
-
-                    if (!titleEl || !priceEl) {
-                        console.error('[admin] form elements missing (prod-title/prod-price)');
-                        return;
-                    }
-
-                    const title = titleEl.value.trim();
-                    if (!title) {
-                        console.warn('[admin] title is empty, product not added');
-                        return;
-                    }
-                    const price = Number(priceEl.value) || 0;
-                    const description = descEl ? descEl.value.trim() : '';
-
-                    // ensure image: prefer text input, otherwise convert selected file
-                    let image = imageInput && imageInput.value.trim() ? imageInput.value.trim() : '';
-                    if ((!image || image === '') && fileInput && fileInput.files && fileInput.files[0]) {
-                        console.log('[admin] converting selected file to dataURL...');
-                        try {
-                            image = await convertFileForStorage(fileInput.files[0]);
-                            console.log('[admin] file converted, length:', image ? image.length : 0);
-                        } catch (err) {
-                            console.warn('[admin] fileToDataURL failed, continuing without image', err);
-                            image = '';
-                        }
-                    }
-
-                    // read selected category if available
-                    let category = null;
-                    if (catSel && catSel.value) {
-                        const cid = String(catSel.value);
-                        const found = loadLocal(CATEGORIES_KEY).find(c => String(c.id) === cid);
-                        if (found) category = { id: found.id, name: found.name };
-                    }
-
-                    const payload = { id: Date.now(), title, price, description, image, category };
-                    const arr = loadLocal(PRODUCTS_KEY);
-                    arr.unshift(payload);
-                    saveLocal(PRODUCTS_KEY, arr);
-
-                    // notify and refresh UI
-                    window.dispatchEvent(new Event('localProductsUpdated'));
-                    renderProductsList();
-
-                    // reset form + preview
-                    addProductForm.reset();
-                    if (el('prod-image-preview')) el('prod-image-preview').innerHTML = '';
-                    console.log('[admin] product saved locally', payload);
-                } catch (err) {
-                    console.error('[admin] add product failed', err);
-                }
-            });
-        } else {
-            console.warn('[admin] addProductForm not found in DOM');
+        container.innerHTML = '<div>Loading products...</div>';
+        try {
+            // Use AdminProductController endpoint
+            const products = await apiRequest('/admin/products');
+            renderProductsList(products);
+        } catch (error) {
+            container.innerHTML = `<div style="color:red">Error loading products: ${escapeHtml(error.message)}</div>`;
         }
     }
 
-    // --- category form (file -> dataURL + submit) ---
-    const catFile = el('cat-image-file');
-    const catImageInput = el('cat-image-url');
-    const catPreview = el('cat-image-preview');
-    const addCategoryForm = el('addCategoryForm');
+    function renderProductsList(products) {
+        const container = el('productsList');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!Array.isArray(products) || !products.length) {
+            container.innerHTML = '<div style="color:#666">No products found.</div>';
+            return;
+        }
+        products.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'admin-item';
+            // Adjust image source based on ProductDto structure (assuming images[0]?.imageUrl)
+            const imageUrl = (p.images && p.images.length > 0) ? p.images[0].imageUrl : 'images/placeholder1.jpg';
+            const price = p.basePrice || 0; // Assuming basePrice is the relevant price
 
-    if (catFile) {
-        catFile.addEventListener('change', async (e) => {
-            const f = e.target.files && e.target.files[0];
-            if (!f) { if (catPreview) catPreview.innerHTML = ''; if (catImageInput) catImageInput.value = ''; return; }
+            item.innerHTML = `
+                <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(p.productName)}" />
+                <div class="meta">
+                  <div style="font-weight:700">${escapeHtml(p.productName)}</div>
+                  <div style="color:#777">LKR ${Number(price).toLocaleString()}</div>
+                  <div style="color:#777; font-size: 0.8em;">SKU: ${escapeHtml(p.sku)}</div>
+                </div>
+                <div class="actions">
+                  <button class="btn-small btn-delete" data-id="${p.productId}">Delete</button>
+                </div>
+            `;
+            item.querySelector('.btn-delete').addEventListener('click', async (e) => {
+                const productId = e.target.dataset.id;
+                if (!productId || !confirm(`Are you sure you want to delete product ID ${productId}?`)) return;
+                try {
+                    // Use AdminProductController endpoint
+                    await apiRequest(`/admin/products/${productId}`, { method: 'DELETE' });
+                    loadAndRenderProducts(); // Refresh list after deleting
+                } catch (error) {
+                    alert(`Failed to delete product: ${error.message}`);
+                }
+            });
+            container.appendChild(item);
+        });
+    }
+
+    // Categories
+    async function loadAndRenderCategories() {
+        const container = el('categoriesList');
+        if (!container) return;
+        container.innerHTML = '<div>Loading categories...</div>';
+        try {
+            // Use public endpoint, assuming admin context allows viewing all
+            // Or change to an admin-specific endpoint if available
+            const categories = await apiRequest('/public/categories');
+            renderCategoriesList(categories);
+            populateProductCategoryOptions(categories); // Update dropdown after loading
+        } catch (error) {
+            container.innerHTML = `<div style="color:red">Error loading categories: ${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    function renderCategoriesList(categories) {
+        const container = el('categoriesList');
+        if (!container) return;
+        container.innerHTML = '';
+        if (!Array.isArray(categories) || !categories.length) {
+            container.innerHTML = '<div style="color:#666">No categories found.</div>';
+            return;
+        }
+        categories.forEach(c => {
+            const item = document.createElement('div');
+            item.className = 'admin-item';
+            // Assuming CategoryDto has categoryName and maybe an image field
+            item.innerHTML = `
+                <img src="${c.image || 'images/placeholder2.jpg'}" alt="" />
+                <div class="meta">
+                  <div style="font-weight:700">${escapeHtml(c.categoryName)}</div>
+                  <div style="color:#777; font-size: 0.8em;">Slug: ${escapeHtml(c.slug)}</div>
+                </div>
+                <div class="actions">
+                  <button class="btn-small btn-delete" data-id="${c.categoryId}">Delete</button>
+                </div>
+            `;
+            item.querySelector('.btn-delete').addEventListener('click', async (e) => {
+                const categoryId = e.target.dataset.id;
+                if (!categoryId || !confirm(`Are you sure you want to delete category ID ${categoryId}?`)) return;
+                try {
+                    // Use CategoryController endpoint (requires ADMIN role)
+                    await apiRequest(`/api/categories/${categoryId}`, { method: 'DELETE' });
+                    loadAndRenderCategories(); // Refresh list after deleting
+                } catch (error) {
+                    alert(`Failed to delete category: ${error.message}`);
+                }
+            });
+            container.appendChild(item);
+        });
+    }
+
+    // Slips (Orders)
+    async function loadAndRenderSlips() {
+        const container = el('slipsContainer');
+        if (!container) return;
+        container.innerHTML = '<div>Loading orders/slips...</div>';
+        try {
+            // Fetch all orders from AdminOrderController
+            const orders = await apiRequest('/api/admin/orders');
+            renderPaymentSlips(orders);
+        } catch (error) {
+            container.innerHTML = `<div style="color:red">Error loading orders/slips: ${escapeHtml(error.message)}</div>`;
+        }
+    }
+
+    function renderPaymentSlips(orders) {
+        const container = document.getElementById('slipsContainer');
+        if (!container) return;
+
+        // Filter orders that have slips and maybe filter by status if needed (e.g., only pending/processing)
+        const ordersWithSlips = orders.filter(order => order.slipFileName && order.slipFilePath);
+
+        if (!ordersWithSlips.length) {
+            container.innerHTML = '<div class="no-slips">No payment slips submitted or found on orders.</div>';
+            return;
+        }
+
+        let html = '<table class="slips-table" aria-describedby="slips-heading">';
+        html += '<thead><tr><th>Order ID</th><th>Customer</th><th>Slip</th><th>Details</th><th>Status</th><th>Verify</th><th>Download</th></tr></thead><tbody>';
+
+        ordersWithSlips.forEach(order => {
+            // Assume paymentStatus holds the verification status ('pending', 'verified', etc.)
+            const isVerified = order.paymentStatus?.paymentStatusName === 'verified';
+            const verifiedAttr = isVerified ? 'checked' : '';
+            const safeDate = order.createdAt ? new Date(order.createdAt).toLocaleString() : '';
+            // Construct slip URL - relative if served from backend, or use full URL if stored elsewhere
+            const slipUrl = `/uploads/${order.slipFilePath}`; // Adjust path based on FileStorageService config and how files are served
+
+            html += `<tr data-order-id="${order.id}">
+              <td>${escapeHtml(order.id)}</td>
+              <td>${escapeHtml(order.customerName)}<br/><small>${escapeHtml(order.customerEmail)}</small></td>
+              <td><img src="${escapeHtml(slipUrl)}" alt="payment slip for order ${order.id}" class="slip-thumb" /></td>
+              <td>
+                <div><strong>Amount:</strong> LKR ${Number(order.totalAmount).toLocaleString()}</div>
+                <div><strong>Slip File:</strong> ${escapeHtml(order.slipFileName)}</div>
+                <div style="margin-top:6px;color:#666;"><small>Ordered: ${safeDate}</small></div>
+              </td>
+              <td>
+                 <div>Order: <span class="status-order-${order.orderStatusType?.orderStatusName}">${escapeHtml(order.orderStatusType?.orderStatusName)}</span></div>
+                 <div>Payment: <span class="status-payment-${order.paymentStatus?.paymentStatusName}">${escapeHtml(order.paymentStatus?.paymentStatusName)}</span></div>
+              </td>
+              <td style="text-align:center;">
+                <input type="checkbox" class="verify-toggle" ${verifiedAttr} data-order-id="${order.id}" aria-label="Toggle verify" />
+              </td>
+              <td style="text-align:center;">
+                <a href="${escapeHtml(slipUrl)}" download="${escapeHtml(order.slipFileName || `slip-${order.id}`)}" class="download-slip btn-small">Download</a>
+              </td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        container.innerHTML = html;
+
+        // Add event listeners for the new checkboxes
+        container.querySelectorAll('.verify-toggle').forEach(toggle => {
+            toggle.addEventListener('change', handleVerifyToggle);
+        });
+    }
+
+    // --- Form Handlers ---
+
+    // Product form
+    const addProductForm = el('addProductForm');
+    const prodImageInputUrl = el('prod-image');
+    const prodImageFileInput = el('prod-image-file');
+    const prodPreview = el('prod-image-preview');
+
+    async function handleProductImageInput(e) {
+        const f = e.target.files && e.target.files[0];
+        if (!f) { if (prodPreview) prodPreview.innerHTML = ''; if (prodImageInputUrl) prodImageInputUrl.value = ''; return; }
+        try {
+            const data = await fileToDataURL(f);
+            if (prodImageInputUrl) prodImageInputUrl.value = data; // Store data URL in the URL field
+            if (prodPreview) prodPreview.innerHTML = `<img src="${data}" alt="preview" style="max-width:160px;max-height:120px;border-radius:6px;object-fit:cover;">`;
+            console.log('prod image converted, length', data.length);
+        } catch (err) {
+            console.error('product image conversion failed', err);
+            if (prodPreview) prodPreview.innerHTML = '<div style="color:#c00">Preview failed</div>';
+        }
+    }
+
+    if (prodImageFileInput) {
+        prodImageFileInput.addEventListener('change', handleProductImageInput);
+    }
+
+
+    if (addProductForm) {
+        addProductForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const submitButton = addProductForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adding...';
+
             try {
-                const data = await fileToDataURL(f);
-                if (catImageInput) catImageInput.value = data;
-                if (catPreview) catPreview.innerHTML = `<img src="${data}" alt="preview" style="max-width:160px;max-height:120px;border-radius:6px;object-fit:cover;">`;
-                console.log('cat image converted, length', data.length);
-            } catch (err) {
-                console.error('category image conversion failed', err);
-                if (catPreview) catPreview.innerHTML = '<div style="color:#c00">Preview failed</div>';
+                const title = el('prod-title').value.trim();
+                const price = Number(el('prod-price').value) || 0;
+                const description = el('prod-desc').value.trim();
+                const categoryId = el('prod-category').value; // Get selected category ID
+                // Use the data URL from the URL input field (populated by file input change)
+                const image = prodImageInputUrl ? prodImageInputUrl.value.trim() : '';
+                // Add other fields as needed (SKU, stock, etc.) - Assuming they exist in your form
+                const sku = el('prod-sku') ? el('prod-sku').value.trim() : `SKU-${Date.now()}`; // Example SKU
+                const stock = el('prod-stock') ? Number(el('prod-stock').value) : 10; // Example Stock
+
+                if (!title || price <= 0) {
+                    throw new Error('Product title and a valid price are required.');
+                }
+
+                const payload = {
+                    productName: title,
+                    basePrice: price,
+                    description: description,
+                    sku: sku, // Add SKU
+                    stockQuantity: stock, // Add Stock
+                    // Include category if one was selected
+                    productCategories: categoryId ? [{ categoryId: Number(categoryId) }] : [],
+                    // Include image if provided (assuming backend handles data URL)
+                    images: image ? [{ imageUrl: image, isPrimary: true }] : [],
+                    // Add other Product fields from your DTO as needed
+                    markupPercentage: 0, // Example
+                    weight: null, // Example
+                    dimensions: null, // Example
+                    minStockLevel: 5, // Example
+                    isActive: true, // Example
+                    featured: false, // Example
+                    isGold: false, // Example
+                    goldWeightGrams: null, // Example
+                    goldPurityKarat: null // Example
+                };
+
+                // Send to backend via API
+                await apiRequest('/admin/products', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                // Reset form and refresh list
+                addProductForm.reset();
+                if (prodPreview) prodPreview.innerHTML = '';
+                if (prodImageInputUrl) prodImageInputUrl.value = ''; // Clear URL field too
+                loadAndRenderProducts(); // Refresh product list
+                alert('Product added successfully!');
+
+            } catch (error) {
+                console.error('Add product failed:', error);
+                alert(`Failed to add product: ${error.message}`);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Add product';
             }
         });
+    }
+
+    // Category form
+    const addCategoryForm = el('addCategoryForm');
+    const catImageInputUrl = el('cat-image-url');
+    const catImageFileInput = el('cat-image-file');
+    const catPreview = el('cat-image-preview');
+
+    async function handleCatImageInput(e) {
+        const f = e.target.files && e.target.files[0];
+        if (!f) { if (catPreview) catPreview.innerHTML = ''; if (catImageInputUrl) catImageInputUrl.value = ''; return; }
+        try {
+            const data = await fileToDataURL(f);
+            if (catImageInputUrl) catImageInputUrl.value = data; // Store data URL
+            if (catPreview) catPreview.innerHTML = `<img src="${data}" alt="preview" style="max-width:160px;max-height:120px;border-radius:6px;object-fit:cover;">`;
+            console.log('cat image converted, length', data.length);
+        } catch (err) {
+            console.error('category image conversion failed', err);
+            if (catPreview) catPreview.innerHTML = '<div style="color:#c00">Preview failed</div>';
+        }
+    }
+
+    if (catImageFileInput) {
+        catImageFileInput.addEventListener('change', handleCatImageInput);
     }
 
     if (addCategoryForm) {
         addCategoryForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const name = el('cat-name') ? el('cat-name').value.trim() : '';
-            let image = catImageInput && catImageInput.value.trim() ? catImageInput.value.trim() : '';
+            const submitButton = addCategoryForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = 'Adding...';
 
             try {
-                if ((!image || image === '') && catFile && catFile.files && catFile.files[0]) {
-                    image = await fileToDataURL(catFile.files[0]);
+                const name = el('cat-name').value.trim();
+                const image = catImageInputUrl ? catImageInputUrl.value.trim() : ''; // Get data URL
+                // Generate slug (simple example, backend might do this better)
+                const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+                if (!name) {
+                    throw new Error('Category name is required.');
                 }
-            } catch (err) {
-                console.warn('category image conversion at submit failed', err);
+
+                const payload = {
+                    categoryName: name,
+                    slug: slug,
+                    // Assuming backend handles image data URL
+                    image: image // Add image field if your CategoryDto supports it
+                    // Add other Category fields as needed
+                };
+
+                // Send to backend via API (Use CategoryController endpoint)
+                await apiRequest('/api/categories', { // Note: Make sure this is ADMIN protected
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                // Reset form and refresh list
+                addCategoryForm.reset();
+                if (catPreview) catPreview.innerHTML = '';
+                if (catImageInputUrl) catImageInputUrl.value = '';
+                loadAndRenderCategories(); // Refresh category list
+                alert('Category added successfully!');
+
+            } catch (error) {
+                console.error('Add category failed:', error);
+                alert(`Failed to add category: ${error.message}`);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Add category';
             }
-
-            const payload = { id: Date.now(), name, image };
-            const arr = loadLocal(CATEGORIES_KEY);
-            arr.unshift(payload);
-            saveLocal(CATEGORIES_KEY, arr);
-
-            addCategoryForm.reset();
-            if (catPreview) catPreview.innerHTML = '';
-            renderCategoriesList();
-            window.dispatchEvent(new Event('localCategoriesUpdated'));
         });
     }
 
-    // --- logout ---
-    const logoutBtn = el('adminLogoutBtn');
-    if (logoutBtn) logoutBtn.addEventListener('click', () => { window.location.href = 'admin-register.html'; });
+    // --- Slip Verification Handler ---
+    async function handleVerifyToggle(event) {
+        const checkbox = event.target;
+        const orderId = checkbox.dataset.orderId;
+        const isVerified = checkbox.checked;
 
-    // --- initial render ---
-    renderProductsList();
-    renderCategoriesList();
+        if (!orderId) return;
 
-    // add near top (after loadLocal / saveLocal helpers)
-    function populateProductCategoryOptions() {
+        checkbox.disabled = true; // Prevent rapid clicking
+
+        try {
+            // Determine the new statuses
+            // If verifying, set payment to 'verified'. If un-verifying, set back to 'pending'.
+            // Keep order status as is, or update based on your workflow (e.g., 'processing'?)
+            const newPaymentStatus = isVerified ? 'verified' : 'pending';
+            // Get current order status to send it back, or decide on a new one
+            const currentOrderStatus = checkbox.closest('tr').querySelector('.status-order')?.textContent || 'processing'; // Example: default to processing
+
+            const payload = {
+                orderStatus: currentOrderStatus, // Or determine next status based on verification
+                paymentStatus: newPaymentStatus
+            };
+
+            // Call the backend API to update the order status
+            await apiRequest(`/api/admin/orders/${orderId}/status`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+
+            // Refresh the slips/orders list to show the update
+            loadAndRenderSlips();
+            // alert(`Order ${orderId} payment status updated to ${newPaymentStatus}`);
+
+        } catch (error) {
+            console.error(`Failed to update status for order ${orderId}:`, error);
+            alert(`Error updating status: ${error.message}`);
+            // Revert checkbox state on failure
+            checkbox.checked = !isVerified;
+        } finally {
+            checkbox.disabled = false;
+        }
+    }
+
+
+    // --- Product Category Dropdown ---
+    function populateProductCategoryOptions(categories = []) {
         const sel = el('prod-category');
         if (!sel) return;
-        sel.innerHTML = '<option value="">Uncategorized</option>';
-        const cats = loadLocal(CATEGORIES_KEY);
-        cats.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = String(c.id);
-            opt.textContent = c.name;
-            sel.appendChild(opt);
+        // Remember selected value if any
+        const selectedValue = sel.value;
+        sel.innerHTML = '<option value="">Uncategorized</option>'; // Default option
+        if (Array.isArray(categories)) {
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = String(c.categoryId);
+                opt.textContent = c.categoryName;
+                sel.appendChild(opt);
+            });
+        }
+        // Restore selected value
+        sel.value = selectedValue;
+    }
+
+    // --- Logout ---
+    const logoutBtn = el('adminLogoutBtn'); // Make sure this button exists in admin.html
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem('adminToken'); // Clear the token
+            window.location.href = 'admin-register.html'; // Redirect to login/register
         });
     }
 
-    // call after initial render and when categories change
-    populateProductCategoryOptions();
-    window.addEventListener('localCategoriesUpdated', populateProductCategoryOptions);
+    // --- Initial Load ---
+    // Load data for the initially active tab (Products)
+    loadAndRenderProducts();
+    // Pre-populate category options (will be updated again when categories tab is loaded)
+    loadAndRenderCategories(); // Also calls populateProductCategoryOptions
 
-    // expose helper for other scripts that load categories onto homepage
-    window.adminClient = {
-        getLocalCategories: () => loadLocal(CATEGORIES_KEY)
-    };
-
-    // add product file -> dataURL + preview handler (mirror of category handler)
-    const prodFile = el('prod-image-file');
-    const prodImageInput = el('prod-image');
-    const prodPreview = el('prod-image-preview');
-
-    if (prodFile) {
-        prodFile.addEventListener('change', async (e) => {
-            const f = e.target.files && e.target.files[0];
-            if (!f) { if (prodPreview) prodPreview.innerHTML = ''; if (prodImageInput) prodImageInput.value = ''; return; }
-            try {
-                const data = await fileToDataURL(f);
-                if (prodImageInput) prodImageInput.value = data;
-                if (prodPreview) prodPreview.innerHTML = `<img src="${data}" alt="preview" style="max-width:160px;max-height:120px;border-radius:6px;object-fit:cover;">`;
-                console.log('prod image converted, length', data.length);
-            } catch (err) {
-                console.error('product image conversion failed', err);
-                if (prodPreview) prodPreview.innerHTML = '<div style="color:#c00">Preview failed</div>';
-            }
-        });
-    }
-
-    // Payment slips management (localStorage fallback)
-    const SLIPS_KEY = 'payment_slips';
-
-    function getSlips() {
-        try {
-            return JSON.parse(localStorage.getItem(SLIPS_KEY) || '[]');
-        } catch (e) {
-            console.warn('failed to parse slips', e);
-            return [];
-        }
-    }
-
-    function saveSlips(slips) {
-        localStorage.setItem(SLIPS_KEY, JSON.stringify(slips));
-    }
-
-    // render slips table into #slipsContainer
-    function renderPaymentSlips() {
-        const container = document.getElementById('slipsContainer');
-        if (!container) return;
-        const slips = getSlips();
-
-        if (!slips.length) {
-            container.innerHTML = '<div class="no-slips">No payment slips submitted yet.</div>';
-            return;
-        }
-
-        let html = '<table class="slips-table" aria-describedby="slips-heading">';
-        html += '<thead><tr><th>Slip</th><th>Details</th><th>Verified</th><th>Download</th></tr></thead><tbody>';
-        slips.forEach(slip => {
-            const verifiedAttr = slip.verified ? 'checked' : '';
-            const safeDate = slip.submittedAt ? new Date(slip.submittedAt).toLocaleString() : '';
-            html += `<tr data-id="${slip.id}">
-          <td><img src="${slip.slipUrl}" alt="payment slip" class="slip-thumb" /></td>
-          <td>
-            <div><strong>Name:</strong> ${escapeHtml(slip.name || '-')}</div>
-            <div><strong>Order:</strong> ${escapeHtml(slip.orderId || '-')}</div>
-            <div><strong>Amount:</strong> ${escapeHtml(slip.amount || '-')}</div>
-            <div><strong>Phone:</strong> ${escapeHtml(slip.phone || '-')}</div>
-            <div><strong>Email:</strong> ${escapeHtml(slip.email || '-')}</div>
-            <div style="margin-top:6px;color:#666;"><small>Submitted: ${safeDate}</small></div>
-          </td>
-          <td style="text-align:center;">
-            <input type="checkbox" class="verify-toggle" ${verifiedAttr} aria-label="Toggle verify" />
-          </td>
-          <td style="text-align:center;">
-            <a href="${slip.slipUrl}" download="slip-${slip.id || ''}" class="download-slip">Download</a>
-          </td>
-        </tr>`;
-        });
-        html += '</tbody></table>';
-        container.innerHTML = html;
-    }
-
-    // small HTML escape to avoid injection in this simple admin UI
-    function escapeHtml(str) {
-        if (!str && str !== 0) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // delegated listener for verify toggles and downloads
-    document.addEventListener('click', (ev) => {
-        const toggle = ev.target.closest('.verify-toggle');
-        if (toggle) {
-            const row = toggle.closest('tr');
-            if (!row) return;
-            const id = row.dataset.id;
-            const slips = getSlips();
-            const idx = slips.findIndex(s => String(s.id) === String(id));
-            if (idx === -1) return;
-            slips[idx].verified = !!toggle.checked;
-            saveSlips(slips);
-            // optional: visual feedback
-            row.style.opacity = slips[idx].verified ? '0.9' : '1';
-            return;
-        }
-
-        // downloads: default anchor download works; this block is here if you want to support blob handling later
-        const dl = ev.target.closest('.download-slip');
-        if (dl) {
-            // let anchor handle download; nothing to do
-            return;
-        }
-    });
-
-    // expose render function to window for tab switch script to call
-    window.renderPaymentSlips = renderPaymentSlips;
-
-    // ensure slips rendered on admin load if slips tab present
-    document.addEventListener('DOMContentLoaded', () => {
-        if (document.getElementById('slipsContainer')) {
-            renderPaymentSlips();
-        }
-    });
-
-    // helper: add test slip (optional) - uncomment to create sample data
-    /*
-    (function seedSample() {
-      if (getSlips().length) return;
-      const sample = [{
-        id: 's1',
-        name: 'John Doe',
-        orderId: 'ORD-1001',
-        amount: 'Rs. 12,000',
-        phone: '+94 7xx xxx xxx',
-        email: 'john@example.com',
-        slipUrl: 'images/sample-slip.jpg', // can be dataURL or remote URL
-        verified: false,
-        submittedAt: Date.now()
-      }];
-      saveSlips(sample);
-    })();
-    */
-})();
-
+})(); // End IIFE

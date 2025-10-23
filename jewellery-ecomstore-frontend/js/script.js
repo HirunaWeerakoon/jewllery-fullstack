@@ -97,11 +97,34 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   // Remove from cart
-  const removeFromCart = (productName) => {
-    cart = cart.filter(item => item.name !== productName);
+  const removeFromCart = async (itemKey) => {
+  try {
+    // Call the backend API to remove the item
+    const response = await fetch(`${API_BASE_URL}/cart/item/${encodeURIComponent(itemKey)}`, {
+      method: 'DELETE',
+      // Add headers if needed (e.g., for authentication)
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to remove item from cart');
+    }
+
+    // Update the local cart based on the backend's response (or refetch the cart)
+    const updatedCartData = await response.json(); // Assuming backend returns the updated cart
+    // Update your local 'cart' variable and localStorage based on updatedCartData
+    // For simplicity, you might just refetch the whole cart:
+    // await fetchCartFromServer(); // You'd need to create this function
+
+    // For now, let's optimistically update the local cart
+    cart = cart.filter(item => item.itemKey !== itemKey); // Filter using itemKey
     localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay();
-  };
+    updateCartDisplay(); // Update the UI
+
+  } catch (error) {
+    console.error('Error removing item from cart:', error);
+    alert('Could not remove item. Please try again.'); // User feedback
+  }
+ };
 
   // Update cart display
   const updateCartDisplay = () => {
@@ -118,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="cart-item-name">${item.name}</div>
             <div class="cart-item-price">$${item.price.toFixed(2)} x ${item.quantity}</div>
           </div>
-          <button class="cart-item-remove" onclick="removeFromCart('${item.name}')">&times;</button>
+          <button class="cart-item-remove" onclick="removeFromCart('${item.itemKey}')">&times;</button>
         </div>
       `).join('');
 

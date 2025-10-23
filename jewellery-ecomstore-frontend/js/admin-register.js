@@ -1,8 +1,8 @@
-// Minimal registration handler — updates localStorage.adminToken and redirects to admin panel.
-// Update baseUrl to your backend later.
+
+
 
 (function () {
-    const baseUrl = 'http://localhost:8080/api'; // change to your backend API when ready
+    const baseUrl = API_BASE_URL; 
     const form = document.getElementById('adminRegisterForm');
     if (!form) return;
 
