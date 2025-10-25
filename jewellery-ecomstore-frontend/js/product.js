@@ -1,4 +1,6 @@
 // Product Page JavaScript with Backend Integration
+
+
 class ProductManager {
     constructor() {
         this.product = null;
@@ -6,7 +8,9 @@ class ProductManager {
 
         // API Configuration - Update these URLs to match your backend
         this.apiConfig = {
-            baseUrl: API_BASE_URL, // Update with your backend URL
+            baseUrl: API_BASE_URL
+
+            , // Update with your backend URL
             endpoints: {
                 product: '/products'
             }
