@@ -54,6 +54,89 @@
         </div>
     </footer>
 
+    <script src="config.js"></script> <script>
+        (function () {
+            const form = document.querySelector('.checkout-form');
+            const submitButton = form.querySelector('.btn-continue');
+            const originalButtonText = submitButton.textContent;
+
+            if (!form) return;
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault(); // Prevent default browser submission
+                submitButton.disabled = true;
+                submitButton.textContent = 'Processing...';
+
+                const formData = new FormData();
+
+                // 1. Get Customer Details
+                const customerDetails = {
+                    customerName: document.getElementById('name').value.trim(),
+                    telephoneNumber: document.getElementById('phone').value.trim(), // Match DTO field name
+                    customerAddress: document.getElementById('address').value.trim(),
+                    customerEmail: document.getElementById('email').value.trim()
+                    // Add other fields from OrderRequestDto if needed, like totalAmount (though backend calculates it)
+                };
+
+                // 2. Append Customer Details as JSON Blob
+                formData.append('orderData', new Blob([JSON.stringify(customerDetails)], {
+                    type: 'application/json'
+                }));
+
+                // 3. Get and Append Slip File
+                const slipInput = document.getElementById('payment-slip');
+                if (slipInput.files.length === 0) {
+                    alert('Please upload a payment slip.');
+                    submitButton.disabled = false;
+                    submitButton.textContent = originalButtonText;
+                    return;
+                }
+                const slipFile = slipInput.files[0];
+                formData.append('slipFile', slipFile);
+
+                // 4. Send the request
+                try {
+                    // Make sure API_BASE_URL is defined in config.js
+                    const response = await fetch(`${API_BASE_URL}/orders`, {
+                        method: 'POST',
+                        body: formData
+                        // DO NOT set Content-Type header manually for FormData
+                    });
+
+                    if (!response.ok) {
+
+                        let errorMsg = `Checkout failed with status: ${response.status}`;
+                        try {
+                            const errorData = await response.json();
+                            errorMsg = errorData.message || errorMsg;
+
+                        } catch (parseError) {
+
+                            errorMsg = await response.text().catch(() => errorMsg);
+                        }
+                        throw new Error(errorMsg);
+                    }
+
+                    const result = await response.json();
+                    console.log('Order created:', result);
+                    alert('Order placed successfully! Order ID: ' + result.id);
+                    // Redirect to a thank you page or homepage
+                    window.location.href = 'index.html';
+
+                } catch (error) {
+                    console.error('Checkout error:', error);
+                    alert('Error placing order: ' + error.message);
+                    submitButton.disabled = false;
+                    submitButton.textContent = originalButtonText;
+                }
+            });
+        })();
+    </script>
+
+</body>
+</html>
+
+
 </body>
 
 </html>

@@ -148,20 +148,56 @@ class CatalogManager {
             return;
         }
 
-        productGrid.innerHTML = this.filteredProducts.map(product => `
+        productGrid.innerHTML = this.filteredProducts.map(product => {
+        const productId = product.productId || product.id;
+        const productName = product.productName || product.name || 'Unknown Product'; // Adapt
+        const price = product.basePrice || product.price || 0; // Adapt
+        const imageUrl = (product.images && product.images.length > 0 && product.images[0].imageUrl)
+            || product.image
+            || 'images/placeholder1.jpg'; // Adapt based on ProductDto
+
+        return `            
             <div class="product-card">
-                <a href="product.html?id=${product.id}" class="product-link" aria-label="View product">
+                 {/* Correct: uses the 'productId' variable */}
+                <a href="product.html?id=${productId}" class="product-link" aria-label="View product ${productName}">
                     <div class="image-wrap">
-                        <img src="${product.image || 'images/placeholder1.jpg'}" alt="${product.name}" />
+                         {/* Correct: uses 'imageUrl' and 'productName' variables */}
+                        <img src="${imageUrl}" alt="${productName}" />
                         <div class="overlay" aria-hidden="true">
-                            <span class="overlay-name">${product.name}</span>
-                            <span class="overlay-price">$${product.price.toFixed(2)}</span>
+                             {/* Correct: uses 'productName' and 'price' variables */}
+                            <span class="overlay-name">${productName}</span>
+                            {/* Correct: uses 'price' variable and LKR currency */}
+                            <span class="overlay-price">LKR ${price.toFixed(2)}</span>
                         </div>
                     </div>
                 </a>
+                 {/* Correct: Button uses 'productId' and 'price' variables */}
+                 <button class="add-to-cart-btn"
+                         data-product-id="${productId}"
+                         data-price="${price}">
+                    ADD TO CART
+                 </button>
             </div>
-        `).join('');
+        `}).join('');
+
+        productGrid.querySelectorAll('.add-to-cart-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const pid = btn.getAttribute('data-product-id');
+                const p = btn.getAttribute('data-price');
+                // Assuming addToCart is globally available from script.js
+                if (window.addToCart && pid && p) {
+                    window.addToCart(pid, p);
+                } else {
+                    console.error("addToCart function not found or missing data attributes");
+                    alert("Error adding to cart.");
+                }
+            });
+        });
+
     }
+
+
 
     showLoading() {
         const productGrid = document.querySelector('.product-grid');

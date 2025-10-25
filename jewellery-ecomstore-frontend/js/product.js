@@ -141,9 +141,15 @@ class ProductManager {
             imageElement.src = this.product.image || 'images/placeholder1.jpg';
             imageElement.alt = this.product.name;
         }
-
+        const addToCartBtn = document.querySelector('.add-to-cart-btn');
         // Update add to cart button with product data
         if (addToCartBtn) {
+            const productId = this.product.productId || this.product.id; // Adapt if needed
+            const price = this.product.basePrice || this.product.price; // Adapt if needed
+            const name = this.product.productName || this.product.name; // Adapt if needed
+            addToCartBtn.setAttribute('data-product', name); // Keep this if needed elsewhere
+            addToCartBtn.setAttribute('data-price', price);
+            addToCartBtn.setAttribute('data-product-id', productId); // <<< Add this line
             addToCartBtn.setAttribute('data-product', this.product.name);
             addToCartBtn.setAttribute('data-price', this.product.price);
         }

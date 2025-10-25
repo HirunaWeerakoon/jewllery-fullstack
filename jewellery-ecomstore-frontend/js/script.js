@@ -41,23 +41,59 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Cart functionality
-  let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
   const cartIcon = document.getElementById('cartIcon');
   const cartSlide = document.getElementById('cartSlide');
   const cartOverlay = document.getElementById('cartOverlay');
   const cartClose = document.getElementById('cartClose');
-  const cartItems = document.getElementById('cartItems');
-  const cartTotal = document.getElementById('cartTotal');
+  const cartItemsEl = document.getElementById('cartItems');
+  const cartTotalEl = document.getElementById('cartTotal');
   const cartCheckoutBtn = document.getElementById('cartCheckoutBtn');
   const addToCartBtns = document.querySelectorAll('.add-to-cart-btn');
 
+  async function fetchCartAPI(endpoint, options = {}) {
+    try {
+      // Ensure API_BASE_URL is defined in config.js
+      const response = await fetch(`${API_BASE_URL}/cart${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        credentials: 'include', // <<< IMPORTANT: Include session cookies
+        ...options,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `HTTP error ${response.status}` }));
+        throw new Error(errorData.message || `API Error: ${response.status}`);
+      }
+      // Handle empty response for DELETE/Clear
+      if (response.status === 204 || response.headers.get('content-length') === '0') {
+        return null; // Or return a default empty cart structure if needed
+      }
+      return await response.json(); // Expects CartResponseDto structure
+    } catch (error) {
+      console.error('Cart API Error:', error);
+      alert(`Cart operation failed: ${error.message}`);
+      throw error; // Re-throw to stop further processing if needed
+    }
+  }
+  const fetchCartFromServer = async () => {
+    try {
+      const cartData = await fetchCartAPI(''); // GET /api/cart
+      updateCartDisplay(cartData);
+    } catch (error) {
+      // Handle error (e.g., show empty cart or error message)
+      if (cartItemsEl) cartItemsEl.innerHTML = '<div class="empty-cart"><p>Could not load cart.</p></div>';
+      if (cartTotalEl) cartTotalEl.textContent = 'Total: $0.00';
+    }
+  };
+
   // Open cart
   const openCart = () => {
+    fetchCartFromServer(); // Refresh cart content when opening
     cartSlide.classList.add('active');
     cartOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
-    updateCartDisplay();
   };
 
   // Close cart
@@ -67,86 +103,101 @@ document.addEventListener('DOMContentLoaded', () => {
     document.body.style.overflow = '';
   };
 
-  // Add to cart
-  const addToCart = (productName, price, imageSrc = 'images/necklace_1.png') => {
-    const existingItem = cart.find(item => item.name === productName);
+  // Add to cart - Calls Backend
+  const addToCart = async (productId, price, attributeValueId = null, quantity = 1) => {
+    const payload = {
+      productId: parseInt(productId, 10),
+      attributeValueId: attributeValueId ? parseInt(attributeValueId, 10) : null,
+      quantity: quantity
+    };
 
-    if (existingItem) {
-      existingItem.quantity += 1;
-    } else {
-      cart.push({
-        name: productName,
-        price: parseFloat(price),
-        quantity: 1,
-        image: imageSrc
-      });
+    // Find the button to show feedback
+    const btn = event ? event.target : null;
+    const originalText = btn ? btn.textContent : 'ADD TO CART';
+    if(btn) {
+      btn.disabled = true;
+      btn.textContent = 'Adding...';
     }
 
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay();
+    try {
+      const updatedCartData = await fetchCartAPI('/add', { // POST /api/cart/add
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      updateCartDisplay(updatedCartData); // Update UI with response
 
-    // Show success animation
-    const btn = event.target;
-    const originalText = btn.textContent;
-    btn.textContent = 'Added!';
-    btn.style.background = '#28a745';
-    setTimeout(() => {
-      btn.textContent = originalText;
-      btn.style.background = '';
-    }, 1000);
+      // Show success animation on button
+      if (btn) {
+        btn.textContent = 'Added!';
+        btn.style.background = '#28a745'; // Green background
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = ''; // Revert background
+          btn.disabled = false;
+        }, 1000);
+      }
+      openCart(); // Optionally open cart after adding
+
+    } catch (error) {
+      if (btn) {
+        btn.textContent = originalText; // Revert text on error
+        btn.disabled = false;
+      }
+      // Error already alerted in fetchCartAPI
+    }
   };
 
   // Remove from cart
   const removeFromCart = async (itemKey) => {
-  try {
-    // Call the backend API to remove the item
-    const response = await fetch(`${API_BASE_URL}/cart/item/${encodeURIComponent(itemKey)}`, {
-      method: 'DELETE',
-      // Add headers if needed (e.g., for authentication)
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to remove item from cart');
+    if (!itemKey) {
+      console.error("removeFromCart called without itemKey");
+      return;
     }
-
-    // Update the local cart based on the backend's response (or refetch the cart)
-    const updatedCartData = await response.json(); // Assuming backend returns the updated cart
-    // Update your local 'cart' variable and localStorage based on updatedCartData
-    // For simplicity, you might just refetch the whole cart:
-    // await fetchCartFromServer(); // You'd need to create this function
-
-    // For now, let's optimistically update the local cart
-    cart = cart.filter(item => item.itemKey !== itemKey); // Filter using itemKey
-    localStorage.setItem('cart', JSON.stringify(cart));
-    updateCartDisplay(); // Update the UI
-
-  } catch (error) {
-    console.error('Error removing item from cart:', error);
-    alert('Could not remove item. Please try again.'); // User feedback
-  }
- };
+    try {
+      // Use DELETE /api/cart/item/{itemKey}
+      const updatedCartData = await fetchCartAPI(`/item/${encodeURIComponent(itemKey)}`, {
+        method: 'DELETE'
+      });
+      // If DELETE returns updated cart, use it. Otherwise, refetch.
+      if (updatedCartData) {
+        updateCartDisplay(updatedCartData);
+      } else {
+        fetchCartFromServer(); // Refetch the cart state
+      }
+    } catch (error) {
+      // Error already alerted in fetchCartAPI
+    }
+  };
 
   // Update cart display
-  const updateCartDisplay = () => {
-    if (!cartItems) return;
-
-    if (cart.length === 0) {
-      cartItems.innerHTML = '<div class="empty-cart"><p>Your cart is empty</p></div>';
-      cartTotal.textContent = 'Total: $0';
+  const updateCartDisplay = (cartData) => {
+    if (!cartItemsEl || !cartTotalEl) return;
+    if (!cartData || !cartData.items || cartData.items.length === 0) {
+      cartItemsEl.innerHTML = '<div class="empty-cart"><p>Your cart is empty</p></div>';
+      cartTotalEl.textContent = 'Total: LKR 0.00'; // Update currency
     } else {
-      cartItems.innerHTML = cart.map(item => `
-        <div class="cart-item">
-          <img src="${item.image}" alt="${item.name}" class="cart-item-image">
-          <div class="cart-item-details">
-            <div class="cart-item-name">${item.name}</div>
-            <div class="cart-item-price">$${item.price.toFixed(2)} x ${item.quantity}</div>
-          </div>
-          <button class="cart-item-remove" onclick="removeFromCart('${item.itemKey}')">&times;</button>
-        </div>
-      `).join('');
+      cartItemsEl.innerHTML = cartData.items.map(item => {
+        // Construct the itemKey needed for removal
+        //const itemKey = `${item.productId}:${item.attributeValueId || '0'}`; // Generate key here
+        return `
+                <div class="cart-item">
+                  <img src="${item.imageUrl || 'images/placeholder1.jpg'}" alt="${item.productName}" class="cart-item-image">
+                  <div class="cart-item-details">
+                    <div class="cart-item-name">${item.productName}</div>
+                    <div class="cart-item-price">LKR ${item.unitPrice.toFixed(2)} x ${item.quantity} = LKR ${item.totalPrice.toFixed(2)}</div>
+                  </div>
+                  <button class="cart-item-remove" data-item-key="${item.itemKey}">&times;</button> </div>
+              `;
+      }).join('');
 
-      const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      cartTotal.textContent = `Total: $${total.toFixed(2)}`;
+      // Add event listeners to newly created remove buttons
+      cartItemsEl.querySelectorAll('.cart-item-remove').forEach(button => {
+        button.addEventListener('click', () => {
+          removeFromCart(button.getAttribute('data-item-key'));
+        });
+      });
+
+      cartTotalEl.textContent = `Total: LKR ${cartData.cartTotal.toFixed(2)}`; // Update currency
     }
   };
 
@@ -195,19 +246,46 @@ document.addEventListener('DOMContentLoaded', () => {
   cartOverlay?.addEventListener('click', closeCart);
 
   cartCheckoutBtn?.addEventListener('click', () => {
-    if (cart.length > 0) {
-      window.location.href = 'checkout.html';
-    }
+    // Check cart status by fetching it (safer than relying on potentially stale UI)
+    fetchCartAPI('').then(cartData => {
+      if (cartData && cartData.items && cartData.items.length > 0) {
+        window.location.href = 'checkout.html';
+      } else {
+        alert("Your cart is empty.");
+        closeCart();
+      }
+    }).catch(() => {
+      alert("Could not verify cart status. Please try again.");
+    });
   });
 
   addToCartBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
-      const productName = btn.getAttribute('data-product');
+      // --- IMPORTANT: Get Product ID and Price ---
+      // Modify product.html and catalog.html generation to include product ID
+      // For now, assuming product ID might be in URL or a data attribute
+      let productId = btn.getAttribute('data-product-id'); // Add this attribute to your buttons
+      if (!productId) {
+        // Fallback: try getting from URL on product page
+        const urlParams = new URLSearchParams(window.location.search);
+        productId = urlParams.get('id');
+      }
+
       const price = btn.getAttribute('data-price');
-      addToCart(productName, price);
+      // const attributeValueId = btn.getAttribute('data-attribute-id'); // Add if you have variants
+
+      if (!productId || !price) {
+        console.error("Missing product ID or price on button:", btn);
+        alert("Could not add item to cart (missing info).");
+        return;
+      }
+
+      addToCart(productId, price /*, attributeValueId */); // Pass relevant data
     });
   });
+  // Initial cart load when the page is ready
+  fetchCartFromServer();
 
   // Make removeFromCart globally available
   window.removeFromCart = removeFromCart;
