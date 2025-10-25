@@ -256,33 +256,30 @@ public class ProductServiceImpl implements ProductService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductDto> getProductsByCategoryId(Long categoryId) {
+        // Ensure category exists (optional but good practice)
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + categoryId));
+
+        // Get descendant category IDs including the category itself
         Set<Long> categoryIdsToSearch = categoryClosureRepository.findDescendantIdsByAncestorId(categoryId);
         if (categoryIdsToSearch == null || categoryIdsToSearch.isEmpty()) {
-            return Collections.emptyList();
+            return Collections.emptyList(); // No categories found
         }
 
-        List<ProductCategory> allProductCategories = productCategoryRepository.findAll();
-        List<ProductCategory> relevantProductCategories = allProductCategories.stream()
-                .filter(pc -> categoryIdsToSearch.contains(pc.getCategory().getCategoryId()))
-                .toList();
-        return productCategories.stream()
+        // --- CORRECTED FETCH: Use findByIdCategoryIdIn for efficiency ---
+        List<ProductCategory> relevantProductCategoryLinks = productCategoryRepository.findByIdCategoryIdIn(categoryIdsToSearch);
+
+        if (relevantProductCategoryLinks.isEmpty()) {
+            return Collections.emptyList(); // No products found for these categories
+        }
+
+        // --- CORRECTED STREAM: Use the 'relevantProductCategoryLinks' variable ---
+        return relevantProductCategoryLinks.stream() // <<< Use the correct variable
                 .map(ProductCategory::getProduct) // Get the Product entity from the link
-                .filter(Objects::nonNull)          // Filter out any null products (shouldn't happen with FKs)
+                .filter(Objects::nonNull)          // Filter out any null products
                 .distinct()                        // Ensure each product appears only once
-                .map(this::toDto)                  // Convert Product entity to ProductDto
-                .collect(Collectors.toList());
-
-        if (relevantProductCategories.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return relevantProductCategories.stream()
-                .map(ProductCategory::getProduct)
-                .filter(Objects::nonNull)
-                .distinct()
-                .map(this::toDto)
+                .filter(p -> p.getIsActive() == null || p.getIsActive()) // Only include active products
+                .map(this::toDto)                  // Convert Product entity to ProductDto (which includes calculated price)
                 .collect(Collectors.toList());
     }
 
