@@ -1,5 +1,6 @@
 package com.example.jewellery_backend.service.impl;
 
+import com.example.jewellery_backend.repository.ProductImageRepository;
 import com.example.jewellery_backend.dto.ProductImageDto;
 import com.example.jewellery_backend.dto.ProductAttributeValueDto;
 import java.util.Collections;
@@ -8,17 +9,14 @@ import com.example.jewellery_backend.dto.ProductDto;
 import com.example.jewellery_backend.dto.ProductCategoryDto;
 import com.example.jewellery_backend.entity.*;
 import com.example.jewellery_backend.exception.ResourceNotFoundException;
-import com.example.jewellery_backend.repository.ProductRepository;
-import com.example.jewellery_backend.repository.CategoryRepository;
-import com.example.jewellery_backend.repository.ProductCategoryRepository;
+import com.example.jewellery_backend.repository.*;
 import com.example.jewellery_backend.service.ProductService;
 import lombok.RequiredArgsConstructor;
-import com.example.jewellery_backend.repository.GoldRateRepository;
 import com.example.jewellery_backend.entity.GoldRate;
 import java.math.RoundingMode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.example.jewellery_backend.repository.CategoryClosureRepository;
+
 import java.math.BigDecimal;
 
 import java.util.*;
@@ -34,6 +32,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductCategoryRepository productCategoryRepository;
     private final CategoryClosureRepository categoryClosureRepository;
     private final GoldRateRepository goldRateRepository;
+    private final ProductImageRepository productImageRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -140,24 +139,40 @@ public class ProductServiceImpl implements ProductService {
         return dto;
     }
 
-    private void applyCategories(Product p, Set<Long> categoryIds) {
-        if (p.getProductCategories() != null) {
-            p.getProductCategories().clear();
-            Iterator<ProductCategory> iterator = p.getProductCategories().iterator();
-            while (iterator.hasNext()) {
-                ProductCategory pc = iterator.next();
-                iterator.remove(); // Remove from collection
-                pc.setProduct(null); // Break bidirectional link
-                pc.setCategory(null);
-            }
-        } else {
+    private void applyCategories(Product p, Set<Long> newCategoryIds) {
+        // Ensure the product's collection is initialized
+        if (p.getProductCategories() == null) {
             p.setProductCategories(new ArrayList<>());
         }
 
-        if (categoryIds != null && !categoryIds.isEmpty()) {
-            for (Long cid : categoryIds) {
-                Category c = categoryRepository.findById(cid)
-                        .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + cid));
+        // Get the IDs of currently associated categories
+        Set<Long> currentCategoryIds = p.getProductCategories().stream()
+                .map(pc -> pc.getCategory().getCategoryId())
+                .collect(Collectors.toSet());
+
+        // Handle null input for new IDs
+        Set<Long> targetCategoryIds = (newCategoryIds == null) ? Collections.emptySet() : newCategoryIds;
+
+        // --- Remove associations no longer needed ---
+        Iterator<ProductCategory> iterator = p.getProductCategories().iterator();
+        while (iterator.hasNext()) {
+            ProductCategory pc = iterator.next();
+            // If the current category ID is NOT in the new set, remove it
+            if (!targetCategoryIds.contains(pc.getCategory().getCategoryId())) {
+                iterator.remove(); // Remove from the product's collection
+                pc.setProduct(null); // Break bidirectional link
+                pc.setCategory(null);
+                // JPA/Hibernate with orphanRemoval=true should handle DB deletion
+                // Or you might need: productCategoryRepository.delete(pc);
+            }
+        }
+
+        // --- Add new associations ---
+        for (Long newId : targetCategoryIds) {
+            // If the new category ID is NOT already associated, add it
+            if (!currentCategoryIds.contains(newId)) {
+                Category c = categoryRepository.findById(newId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Category", "id", newId));
 
                 ProductCategory pc = ProductCategory.builder()
                         .id(new ProductCategoryId(p.getProductId(), c.getCategoryId()))
@@ -165,7 +180,8 @@ public class ProductServiceImpl implements ProductService {
                         .category(c)
                         .build();
 
-                p.getProductCategories().add(pc);
+                p.getProductCategories().add(pc); // Add to the managed collection
+                // Saving is handled by saving the owning Product entity later
             }
         }
     }
@@ -196,6 +212,18 @@ public class ProductServiceImpl implements ProductService {
 
         Product saved = productRepository.save(p);
         applyCategories(saved, req.getCategoryIds());
+        if (req.getImages() != null && !req.getImages().isEmpty()) {
+            List<ProductImage> images = req.getImages().stream().map(imgDto ->
+                            ProductImage.builder()
+                                    .product(savedProduct)
+                                    .imageUrl(imgDto.getImageUrl())
+                                    .altText(imgDto.getAltText() != null ? imgDto.getAltText() : req.getProductName()) // Default alt text
+                                    .isPrimary(imgDto.getIsPrimary() != null ? imgDto.getIsPrimary() : false)
+                                    .sortOrder(imgDto.getSortOrder() != null ? imgDto.getSortOrder() : 0)
+                                    .build()
+            ).collect(Collectors.toList());
+            savedProduct.setImages(images); // Set the mapped images on the product
+        }
         Product fullySaved = productRepository.save(saved);
         return toDto(fullySaved);
     }
@@ -221,6 +249,36 @@ public class ProductServiceImpl implements ProductService {
         if (req.getGoldPurityKarat() != null) p.setGoldPurityKarat(req.getGoldPurityKarat());
 
         applyCategories(p, req.getCategoryIds());
+        if (req.getImages() != null) { // Check if images data is provided in request
+            // Clear existing images managed by JPA
+            if (p.getImages() == null) {
+                p.setImages(new ArrayList<>());
+            }
+            // Use iterator to safely remove while iterating and break links
+            Iterator<ProductImage> imgIterator = p.getImages().iterator();
+            while (imgIterator.hasNext()) {
+                ProductImage existingImg = imgIterator.next();
+                imgIterator.remove(); // Remove from product's collection
+                existingImg.setProduct(null); // Break bidirectional link
+            }
+            // Optional: If orphanRemoval=true isn't working reliably, delete explicitly
+            // productImageRepository.deleteAll(imagesToRemove);
+
+
+            // Add new/updated images from the request
+            List<ProductImage> newImages = req.getImages().stream().map(imgDto ->
+                    ProductImage.builder()
+                            .product(p) // Link to the current product
+                            .imageUrl(imgDto.getImageUrl())
+                            .altText(imgDto.getAltText() != null ? imgDto.getAltText() : p.getProductName())
+                            .isPrimary(imgDto.getIsPrimary() != null ? imgDto.getIsPrimary() : false)
+                            .sortOrder(imgDto.getSortOrder() != null ? imgDto.getSortOrder() : 0)
+                            // If updating existing images based on ID, fetch existing or handle merge:
+                            // .imageId(imgDto.getImageId()) // Need logic to merge/update vs create
+                            .build()
+            ).collect(Collectors.toList());
+            p.getImages().addAll(newImages); // Add all new/updated images
+        }
         Product updated = productRepository.save(p);
         return toDto(updated);
     }
