@@ -1,4 +1,5 @@
 package com.example.jewellery_backend.service.impl;
+
 import com.example.jewellery_backend.dto.ProductImageDto;
 import com.example.jewellery_backend.dto.ProductAttributeValueDto;
 import java.util.Collections;
@@ -15,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.jewellery_backend.repository.CategoryClosureRepository;
+import java.math.BigDecimal;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,14 +31,18 @@ public class ProductServiceImpl implements ProductService {
     private final ProductCategoryRepository productCategoryRepository;
     private final CategoryClosureRepository categoryClosureRepository;
 
+    @Override
+    public BigDecimal getUpdatedPrice(Long id) {
+        Product product = findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        return product.getPrice();
+    }
+
     // ---------------- Mapping methods ----------------
 
     private ProductDto toDto(Product p) {
-        if (p == null) {
-            return null; // Handle null product input
-        }
+        if (p == null) return null;
 
-        // --- Map basic fields ---
         ProductDto dto = ProductDto.builder()
                 .productId(p.getProductId())
                 .productName(p.getProductName())
@@ -53,12 +59,11 @@ public class ProductServiceImpl implements ProductService {
                 .isGold(p.getIsGold())
                 .goldWeightGrams(p.getGoldWeightGrams())
                 .goldPurityKarat(p.getGoldPurityKarat())
-                .build(); // Initial build
+                .build();
 
-        // --- Map Categories ---
         if (p.getProductCategories() != null && !p.getProductCategories().isEmpty()) {
             List<ProductCategoryDto> categoryDtos = p.getProductCategories().stream()
-                    .filter(pc -> pc.getCategory() != null) // Avoid errors if category is null
+                    .filter(pc -> pc.getCategory() != null)
                     .map(pc -> {
                         Category c = pc.getCategory();
                         return ProductCategoryDto.builder()
@@ -66,21 +71,19 @@ public class ProductServiceImpl implements ProductService {
                                 .categoryName(c.getCategoryName())
                                 .categorySlug(c.getSlug())
                                 .categoryIsActive(c.getIsActive())
-                                // Also add product info back-reference if needed in DTO
-                                .productId(p.getProductId()) // Link back to product
+                                .productId(p.getProductId())
                                 .productName(p.getProductName())
                                 .build();
                     })
                     .collect(Collectors.toList());
             dto.setProductCategories(categoryDtos);
         } else {
-            dto.setProductCategories(Collections.emptyList()); // Use empty list instead of null
+            dto.setProductCategories(Collections.emptyList());
         }
 
-        // --- Map Images ---
         if (p.getImages() != null && !p.getImages().isEmpty()) {
             List<ProductImageDto> imageDtos = p.getImages().stream()
-                    .map(img -> ProductImageDto.builder() // Use the builder from ProductImageDto
+                    .map(img -> ProductImageDto.builder()
                             .imageId(img.getImageId())
                             .imageUrl(img.getImageUrl())
                             .altText(img.getAltText())
@@ -90,21 +93,19 @@ public class ProductServiceImpl implements ProductService {
                     .collect(Collectors.toList());
             dto.setImages(imageDtos);
         } else {
-            dto.setImages(Collections.emptyList()); // Use empty list instead of null
+            dto.setImages(Collections.emptyList());
         }
 
-        // --- Map Attribute Values ---
         if (p.getAttributeValues() != null && !p.getAttributeValues().isEmpty()) {
             List<ProductAttributeValueDto> attributeDtos = p.getAttributeValues().stream()
-                    // Use the static factory method from ProductAttributeValueDto
                     .map(ProductAttributeValueDto::fromEntity)
                     .collect(Collectors.toList());
             dto.setAttributeValues(attributeDtos);
         } else {
-            dto.setAttributeValues(Collections.emptyList()); // Use empty list instead of null
+            dto.setAttributeValues(Collections.emptyList());
         }
 
-        return dto; // Return the fully populated DTO
+        return dto;
     }
 
     private void applyCategories(Product p, Set<Long> categoryIds) {
@@ -120,10 +121,7 @@ public class ProductServiceImpl implements ProductService {
                         .orElseThrow(() -> new ResourceNotFoundException("Category", "id", cid));
 
                 ProductCategory pc = ProductCategory.builder()
-                        .id(new ProductCategoryId(
-                                p.getProductId(),
-                                c.getCategoryId()
-                        ))
+                        .id(new ProductCategoryId(p.getProductId(), c.getCategoryId()))
                         .product(p)
                         .category(c)
                         .build();
@@ -154,10 +152,8 @@ public class ProductServiceImpl implements ProductService {
                 .goldPurityKarat(req.getGoldPurityKarat())
                 .build();
 
-        Product saved = productRepository.save(p); // Save first to get ID
-
+        Product saved = productRepository.save(p);
         applyCategories(saved, req.getCategoryIds());
-
         return toDto(productRepository.save(saved));
     }
 
@@ -182,7 +178,6 @@ public class ProductServiceImpl implements ProductService {
         p.setGoldPurityKarat(req.getGoldPurityKarat());
 
         applyCategories(p, req.getCategoryIds());
-
         return toDto(productRepository.save(p));
     }
 
@@ -208,38 +203,44 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public List<ProductDto> getProductsByCategoryId(Long categoryId) {
-        // 1. Find all descendant category IDs (including the category itself)
-        Set<Long> categoryIdsToSearch = categoryClosureRepository.findDescendantIdsByAncestorId(categoryId);
+    public Product saveProduct(Product product) {
+        return productRepository.save(product);
+    }
 
+    @Override
+    public List<ProductDto> getProductsByCategoryId(Long categoryId) {
+        Set<Long> categoryIdsToSearch = categoryClosureRepository.findDescendantIdsByAncestorId(categoryId);
         if (categoryIdsToSearch == null || categoryIdsToSearch.isEmpty()) {
-            return Collections.emptyList(); // No descendants found (or category doesn't exist)
+            return Collections.emptyList();
         }
 
-        // 2. Find all product-category links for these IDs
-        // Note: This requires a custom query or fetching all and filtering in memory.
-        // Let's create a more efficient query. Add this method to ProductCategoryRepository:
-        // List<ProductCategory> findByIdCategoryIdIn(Set<Long> categoryIds);
-        // --- TEMPORARY IN-MEMORY FILTER (Less efficient for many products) ---
-        List<ProductCategory> allProductCategories = productCategoryRepository.findAll(); // Less efficient
+        List<ProductCategory> allProductCategories = productCategoryRepository.findAll();
         List<ProductCategory> relevantProductCategories = allProductCategories.stream()
                 .filter(pc -> categoryIdsToSearch.contains(pc.getCategory().getCategoryId()))
                 .toList();
-        // --- END TEMPORARY ---
-
-        // If you add findByIdCategoryIdIn to ProductCategoryRepository, use this instead:
-        // List<ProductCategory> relevantProductCategories = productCategoryRepository.findByIdCategoryIdIn(categoryIdsToSearch);
-
 
         if (relevantProductCategories.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 3. Extract distinct products and map to DTOs
         return relevantProductCategories.stream()
                 .map(ProductCategory::getProduct)
-                .filter(Objects::nonNull) // Ensure product is not null
-                .distinct() // Avoid duplicate products if linked to multiple relevant categories
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public Optional<Product> findById(Long id) {
+        return productRepository.findById(id);
+    }
+
+    // ---------------- NEW METHOD ----------------
+    @Override
+    public List<ProductDto> getActiveProducts() {
+        return productRepository.findByIsActiveTrue()
+                .stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }

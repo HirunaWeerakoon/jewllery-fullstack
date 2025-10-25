@@ -1,7 +1,6 @@
 package com.example.jewellery_backend.service;
 import com.example.jewellery_backend.repository.OrderStatusTypeRepository;
 import com.example.jewellery_backend.repository.PaymentStatusTypeRepository;
-import com.example.jewellery_backend.dto.OrderItemRequestDto;
 import com.example.jewellery_backend.dto.OrderRequestDto;
 import com.example.jewellery_backend.entity.*;
 import com.example.jewellery_backend.exception.InsufficientStockException;

@@ -5,9 +5,7 @@ import com.example.jewellery_backend.CartItem;
 import com.example.jewellery_backend.dto.*;
 import com.example.jewellery_backend.exception.ProductNotFoundException;
 import com.example.jewellery_backend.util.CartMapper;
-import com.example.jewellery_backend.entity.*;
 import com.example.jewellery_backend.repository.*;
-import com.example.jewellery_backend.service.CartService;
 import com.example.jewellery_backend.entity.Product;
 import com.example.jewellery_backend.entity.ProductImage;
 
