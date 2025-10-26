@@ -90,7 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Open cart
   const openCart = () => {
-    fetchCartFromServer(); // Refresh cart content when opening
+    //fetchCartFromServer(); // Refresh cart content when opening
     cartSlide.classList.add('active');
     cartOverlay.classList.add('active');
     document.body.style.overflow = 'hidden';
