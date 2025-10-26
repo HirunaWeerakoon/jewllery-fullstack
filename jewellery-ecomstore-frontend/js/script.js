@@ -136,7 +136,7 @@ document.addEventListener('DOMContentLoaded', () => {
           btn.disabled = false;
         }, 1000);
       }
-      openCart(); // Optionally open cart after adding
+      //openCart();  Optionally open cart after adding
 
     } catch (error) {
       if (btn) {

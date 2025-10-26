@@ -12,7 +12,7 @@ class ProductManager {
 
             , // Update with your backend URL
             endpoints: {
-                product: '/products'
+                product: '/public/products'
             }
         };
 
@@ -87,11 +87,9 @@ class ProductManager {
 
         const productInfo = document.querySelector('.product-info');
 
-        // If loading placeholder exists, remove and reveal content
         if (productInfo) {
             const loadingEl = productInfo.querySelector('.loading-product');
             if (loadingEl) loadingEl.remove();
-            // unhide any hidden children
             Array.from(productInfo.children).forEach((child) => {
                 if (!(child.classList && child.classList.contains('loading-product'))) {
                     child.style.display = '';
@@ -99,63 +97,63 @@ class ProductManager {
             });
         }
 
-        // Ensure required DOM exists (in case a previous version replaced it)
+
+
+        // Find elements
         let titleElement = document.querySelector('.product-title');
         let priceElement = document.querySelector('.product-price');
         let descriptionElement = document.querySelector('.product-description');
         let addToCartBtn = document.querySelector('.add-to-cart-btn');
+        let imageElement = document.querySelector('.main-image');
 
-        if (productInfo && (!titleElement || !priceElement || !descriptionElement || !addToCartBtn)) {
-            productInfo.innerHTML = `
-                <h1 class="product-title"></h1>
-                <p class="product-price"></p>
-                <p class="product-description"></p>
-                <div style="display:flex; gap:12px;">
-                  <button class="btn-add-cart add-to-cart-btn" data-product="" data-price="">ADD TO CART</button>
-                </div>
-            `;
-            titleElement = productInfo.querySelector('.product-title');
-            priceElement = productInfo.querySelector('.product-price');
-            descriptionElement = productInfo.querySelector('.product-description');
-            addToCartBtn = productInfo.querySelector('.add-to-cart-btn');
+        // Get data from DTO, providing fallbacks
+        const productId = this.product.productId || this.product.id;
+        const productName = this.product.productName || this.product.name || 'Product Title';
+        const price = this.product.basePrice || this.product.price || 0;
+        const description = this.product.description || 'No description available.';
+
+
+        let imageUrl = 'images/placeholder1.jpg'; // Default
+        if (this.product.images && this.product.images.length > 0) {
+
+            const primaryImage = this.product.images.find(img => img.isPrimary === true);
+
+            imageUrl = primaryImage ? primaryImage.imageUrl : this.product.images[0].imageUrl;
         }
 
         // Update product title
         if (titleElement) {
-            titleElement.textContent = this.product.name;
+            titleElement.textContent = productName;
         }
 
         // Update product price
         if (priceElement) {
-            priceElement.textContent = `$${this.product.price.toFixed(2)}`;
+            // Format price with LKR
+            priceElement.textContent = `LKR ${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
 
         // Update product description
         if (descriptionElement) {
-            descriptionElement.textContent = this.product.description;
+            descriptionElement.textContent = description;
         }
 
         // Update product image
-        const imageElement = document.querySelector('.main-image');
         if (imageElement) {
-            imageElement.src = this.product.image || 'images/placeholder1.jpg';
-            imageElement.alt = this.product.name;
-        }
-        const addToCartBtn = document.querySelector('.add-to-cart-btn');
-        // Update add to cart button with product data
-        if (addToCartBtn) {
-            const productId = this.product.productId || this.product.id; // Adapt if needed
-            const price = this.product.basePrice || this.product.price; // Adapt if needed
-            const name = this.product.productName || this.product.name; // Adapt if needed
-            addToCartBtn.setAttribute('data-product', name); // Keep this if needed elsewhere
-            addToCartBtn.setAttribute('data-price', price);
-            addToCartBtn.setAttribute('data-product-id', productId); // <<< Add this line
-            addToCartBtn.setAttribute('data-product', this.product.name);
-            addToCartBtn.setAttribute('data-price', this.product.price);
+            imageElement.src = imageUrl;
+            imageElement.alt = productName;
         }
 
-        // Update page title
-        document.title = `${this.product.name} - Luxury Boutique`;
+
+        if (addToCartBtn) {
+            addToCartBtn.setAttribute('data-product', productName); // Name for cart UI
+            addToCartBtn.setAttribute('data-price', price);
+            addToCartBtn.setAttribute('data-product-id', productId); // ID for API
+        }
+
+
+        document.title = `${productName} - Luxury Boutique`;
+
+
     }
 
     showLoading() {
