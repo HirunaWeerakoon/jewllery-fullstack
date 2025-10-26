@@ -217,7 +217,7 @@
         let categories = [];
         try {
             // Use the public endpoint, adjust if you have a specific admin one
-            categories = await apiRequest('/api/categories');
+            categories = await apiRequest('/categories');
             renderCategoriesList(categories);
         } catch (err) {
             categoriesListEl.innerHTML = `<div style="color:red">Error loading categories: ${escapeHtml(err.message)}</div>`;
@@ -270,7 +270,7 @@
                 if (!confirm(`Delete category "${name}" (ID: ${id})?`)) return;
                 try {
                     // Use correct admin endpoint which requires authentication
-                    await apiRequest(`/api/categories/${id}`, { method: 'DELETE' });
+                    await apiRequest(`categories/${id}`, { method: 'DELETE' });
                     loadAndRenderCategories(); // Refresh list
                 } catch (err) {
                     alert('Delete failed: ' + err.message);
@@ -325,7 +325,7 @@
                 };
 
                 // Use correct admin endpoint which requires authentication
-                await apiRequest('/api/categories', {
+                await apiRequest('/categories', {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
