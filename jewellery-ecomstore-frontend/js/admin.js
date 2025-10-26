@@ -125,6 +125,7 @@
     // Upload file when selected, fill URL and preview
     if (prodImageFileInput) {
         prodImageFileInput.addEventListener('change', async (e) => {
+    
             const file = e.target.files && e.target.files[0];
             if (!file) {
                 if (prodPreview) prodPreview.innerHTML = '';
@@ -147,7 +148,7 @@
     // Submit new product
     if (addProductForm) {
         addProductForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+
             const submitBtn = addProductForm.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
@@ -304,7 +305,7 @@
     // --- Submit New Category ---
     if (addCategoryForm) {
         addCategoryForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
+
             const submitBtn = addCategoryForm.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
