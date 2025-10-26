@@ -27,12 +27,12 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/orders", "/api/products/{productId}/reviews", "/api/cart/**", "/api/admin-users/register", "/api/admin-users/login", "/api/upload").permitAll()
                         .requestMatchers(HttpMethod.PUT, "/api/cart/**").permitAll()
                         .requestMatchers(HttpMethod.DELETE, "/api/cart/**").permitAll()
-                        // Use a literal role to avoid compile issues and coupling to entities
                         .requestMatchers("/api/admin/**", "/admin/**").hasRole("ADMIN")
                         .anyRequest().permitAll()
                 )
                 .httpBasic(Customizer.withDefaults())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATEFUL)); // Keep STATEFUL as corrected before
+                // Use IF_REQUIRED (or ALWAYS) for stateful sessions
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));
 
         return http.build();
     }
