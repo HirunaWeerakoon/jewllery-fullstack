@@ -215,14 +215,14 @@ public class ProductServiceImpl implements ProductService {
         if (req.getImages() != null && !req.getImages().isEmpty()) {
             List<ProductImage> images = req.getImages().stream().map(imgDto ->
                             ProductImage.builder()
-                                    .product(savedProduct)
+                                    .product(saved)
                                     .imageUrl(imgDto.getImageUrl())
                                     .altText(imgDto.getAltText() != null ? imgDto.getAltText() : req.getProductName()) // Default alt text
                                     .isPrimary(imgDto.getIsPrimary() != null ? imgDto.getIsPrimary() : false)
                                     .sortOrder(imgDto.getSortOrder() != null ? imgDto.getSortOrder() : 0)
                                     .build()
             ).collect(Collectors.toList());
-            savedProduct.setImages(images); // Set the mapped images on the product
+            saved.setImages(images); // Set the mapped images on the product
         }
         Product fullySaved = productRepository.save(saved);
         return toDto(fullySaved);
