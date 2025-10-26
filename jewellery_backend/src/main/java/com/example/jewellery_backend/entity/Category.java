@@ -26,8 +26,7 @@ public class Category {
     @Column(name = "category_name", nullable = false, length = 100)
     private String categoryName;
 
-    @Column(name = "category_slug", nullable = false, unique = true, length = 120)
-    private String slug;
+
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_category_id", foreignKey = @ForeignKey(name = "fk_categories_parent"))

@@ -125,7 +125,7 @@
     // Upload file when selected, fill URL and preview
     if (prodImageFileInput) {
         prodImageFileInput.addEventListener('change', async (e) => {
-    
+            e.preventDefault();
             const file = e.target.files && e.target.files[0];
             if (!file) {
                 if (prodPreview) prodPreview.innerHTML = '';
@@ -284,6 +284,7 @@
     // --- Handle Category Image Upload --- (Similar to Product Image)
     if (catImageFileInput) {
         catImageFileInput.addEventListener('change', async (e) => {
+            e.preventDefault();
             const file = e.target.files && e.target.files[0];
             if (!file) {
                 if (catPreview) catPreview.innerHTML = '';
