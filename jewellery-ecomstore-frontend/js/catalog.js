@@ -17,7 +17,7 @@ class CatalogManager {
 
             ,
             endpoints: {
-                products: '/products',
+                products: '/public/products',
                 categories: '/categories',
                 productsByCategory: '/products/category'
             }

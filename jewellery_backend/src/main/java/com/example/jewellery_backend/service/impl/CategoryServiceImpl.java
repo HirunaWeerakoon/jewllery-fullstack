@@ -28,6 +28,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .categoryName(c.getCategoryName())
                 .slug(c.getSlug())
                 .isActive(c.getIsActive())
+                .imageUrl(c.getImageUrl())
                 .build();
     }
 
@@ -35,6 +36,7 @@ public class CategoryServiceImpl implements CategoryService {
         Category c = new Category();
         c.setCategoryName(dto.getCategoryName());
         c.setSlug(dto.getSlug());
+        c.setImageUrl(dto.getImageUrl());
         return c;
     }
 

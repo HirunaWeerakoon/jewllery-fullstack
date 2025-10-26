@@ -1,6 +1,6 @@
 {
     "java.compile.nullAnalysis.mode": "automatic",
-    "liveServer.settings.port": 5501, // Or your port
+    "liveServer.settings.port": 5501,
     "liveServer.settings.ignoreFiles": [
         ".vscode/**",
         "**/*.scss",
@@ -8,6 +8,6 @@
         "**/node_modules/**",
         "**/bower_components/**",
         "**/.git/**",
-        "jewellery_backend/uploads/**" // This tells Live Server to ignore the uploads folder
+        "jewellery_backend/uploads/**"
     ]
 }

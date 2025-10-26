@@ -255,7 +255,7 @@
             item.className = 'admin-item'; // Reuse existing style
             item.innerHTML = `
                 {/* Add image if category DTO includes it */}
-                {/* <img src="${escapeHtml(cat.imageUrl || 'images/placeholder2.jpg')}" alt="${escapeHtml(cat.categoryName)}" /> */}
+                {<img src="${escapeHtml(cat.imageUrl || 'images/placeholder2.jpg')}" alt="${escapeHtml(cat.categoryName)}" /> }
                 <div class="meta">
                   <div style="font-weight:700">${escapeHtml(cat.categoryName)}</div>
                   <div style="color:#777; font-size: .8em">ID: ${cat.categoryId}, Slug: ${escapeHtml(cat.slug || '')}</div>
@@ -271,7 +271,7 @@
                 if (!confirm(`Delete category "${name}" (ID: ${id})?`)) return;
                 try {
                     // Use correct admin endpoint which requires authentication
-                    await apiRequest(`categories/${id}`, { method: 'DELETE' });
+                    await apiRequest(`/categories/${id}`, { method: 'DELETE' });
                     loadAndRenderCategories(); // Refresh list
                 } catch (err) {
                     alert('Delete failed: ' + err.message);
@@ -322,7 +322,7 @@
                     categoryName: name,
                     slug: slug,
                     // Add imageUrl if your CategoryDto supports it
-                    // imageUrl: imageUrl,
+                    imageUrl: imageUrl,
                     isActive: true // Default to active
                 };
 
