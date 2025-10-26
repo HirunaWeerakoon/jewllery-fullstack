@@ -354,7 +354,7 @@
         slipsContainerEl.innerHTML = 'Loading payment slips (orders)...';
         try {
             // Fetch orders from the admin endpoint
-            const orders = await apiRequest('/api/admin/orders'); // GET /api/admin/orders
+            const orders = await apiRequest('/admin/orders'); // GET /api/admin/orders
 
             if (!Array.isArray(orders) || orders.length === 0) {
                 slipsContainerEl.innerHTML = '<div class="no-slips">No orders with slips found yet.</div>';
@@ -424,7 +424,7 @@
                         orderStatus: currentOrderStatus // Keep current order status (or set to 'processing' etc.)
                     };
 
-                    await apiRequest(`/api/admin/orders/${orderId}/status`, {
+                    await apiRequest(`/admin/orders/${orderId}/status`, {
                         method: 'PUT',
                         body: JSON.stringify(payload)
                     });
