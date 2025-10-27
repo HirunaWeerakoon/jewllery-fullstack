@@ -149,34 +149,25 @@ class CatalogManager {
         }
 
         productGrid.innerHTML = this.filteredProducts.map(product => {
-        const productId = product.productId || product.id;
-        const productName = product.productName || product.name || 'Unknown Product'; // Adapt
-        const price = product.basePrice || product.price || 0; // Adapt
-        const imageUrl = (product.images && product.images.length > 0 && product.images[0].imageUrl)
-            || product.image
-            || 'images/placeholder1.jpg'; // Adapt based on ProductDto
+            const productId = product.productId || product.id;
+            const productName = product.productName || product.name || 'Unknown Product'; // Adapt
+            const price = product.basePrice || product.price || 0; // Adapt
+            const imageUrl = (product.images && product.images.length > 0 && product.images[0].imageUrl)
+                || product.image
+                || 'images/placeholder1.jpg'; // Adapt based on ProductDto
 
-        return `            
+            // Removed the comments and the <button> element from the template
+            return `
             <div class="product-card">
-                 {/* Correct: uses the 'productId' variable */}
                 <a href="product.html?id=${productId}" class="product-link" aria-label="View product ${productName}">
                     <div class="image-wrap">
-                         {/* Correct: uses 'imageUrl' and 'productName' variables */}
                         <img src="${imageUrl}" alt="${productName}" />
                         <div class="overlay" aria-hidden="true">
-                             {/* Correct: uses 'productName' and 'price' variables */}
                             <span class="overlay-name">${productName}</span>
-                            {/* Correct: uses 'price' variable and LKR currency */}
                             <span class="overlay-price">LKR ${price.toFixed(2)}</span>
                         </div>
                     </div>
                 </a>
-                 {/* Correct: Button uses 'productId' and 'price' variables */}
-                 <button class="add-to-cart-btn"
-                         data-product-id="${productId}"
-                         data-price="${price}">
-                    ADD TO CART
-                 </button>
             </div>
         `}).join('');
 
