@@ -146,51 +146,80 @@
     }
 
     // Submit new product
+    // Submit new product
     if (addProductForm) {
         addProductForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent default form submission
 
             const submitBtn = addProductForm.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Adding...';
             try {
+                // --- Read existing and NEW values ---
                 const title = el('prod-title').value.trim();
-                const price = Number(el('prod-price').value) || 0;
+                const basePrice = Number(el('prod-price').value) || 0; // Renamed variable for clarity
+                const markupPercentage = Number(el('prod-markup').value) || 0; // Read markup
                 const desc = el('prod-desc').value.trim();
                 const categoryId = el('prod-category') ? el('prod-category').value : null;
-                const sku = el('prod-sku') ? el('prod-sku').value.trim() : `SKU-${Date.now()}`;
-                const stock = el('prod-stock') ? Number(el('prod-stock').value) : 0;
+                const sku = el('prod-sku') ? el('prod-sku').value.trim() : `SKU-${Date.now()}`; // Example if you add SKU field
+                const stock = el('prod-stock') ? Number(el('prod-stock').value) : 10; // Example if you add Stock field
+
+                // Read Gold values
+                const isGold = el('prod-is-gold').checked;
+                const goldWeight = isGold ? (Number(el('prod-gold-weight').value) || null) : null; // null if not gold or empty
+                const goldPurity = isGold ? (Number(el('prod-gold-purity').value) || null) : null; // null if not gold or empty
+
                 const imageUrl = prodImageUrlInput ? prodImageUrlInput.value.trim() : '';
 
-                if (!title || price <= 0) { throw new Error('Product title and valid price required'); }
+                // Basic validation
+                if (!title || basePrice < 0) { throw new Error('Product title and valid Base Price required'); }
+                if (markupPercentage < 0) { throw new Error('Markup Percentage cannot be negative');}
+                if (isGold && (!goldWeight || goldWeight <= 0 || !goldPurity || goldPurity <= 0)) {
+                    throw new Error('If "Is Gold" is checked, please provide valid Gold Weight (>0) and Purity (>0).');
+                }
 
+                // --- Update Payload ---
                 const payload = {
                     productName: title,
-                    basePrice: price,
+                    basePrice: basePrice,             // Use basePrice here
+                    markupPercentage: markupPercentage, // Add markupPercentage
                     description: desc,
                     sku: sku,
                     stockQuantity: stock,
+                    // Handle category selection - ensure categoryId is a number if selected
                     productCategories: categoryId ? [{ categoryId: Number(categoryId) }] : [],
                     images: imageUrl ? [{ imageUrl: imageUrl, isPrimary: true }] : [],
                     isActive: true,
-                    markupPercentage: 10 // 👈 Added this line — prevents SQL null error
+                    // Add gold properties
+                    isGold: isGold,
+                    goldWeightGrams: goldWeight,
+                    goldPurityKarat: goldPurity
                 };
 
+                console.log("Sending payload:", JSON.stringify(payload, null, 2)); // Log payload for debugging
+
+                // Assuming API endpoint is correct for create/update
+                // If you have separate create/update logic, adjust accordingly
                 await apiRequest('/admin/products', {
-                    method: 'POST',
+                    method: 'POST', // Or PUT if updating
                     body: JSON.stringify(payload)
                 });
 
                 addProductForm.reset();
                 if (prodPreview) prodPreview.innerHTML = '';
                 if (prodImageUrlInput) prodImageUrlInput.value = '';
-                await loadAndRenderProducts();
-                alert('Product added successfully!');
+                // Hide gold fields again after reset
+                const goldFieldsDiv = document.getElementById('gold-fields');
+                if (goldFieldsDiv) goldFieldsDiv.style.display = 'none';
+
+                await loadAndRenderProducts(); // Refresh product list
+                alert('Product added/updated successfully!');
             } catch (err) {
-                console.error('Add product failed', err);
-                alert('Failed: ' + err.message);
+                console.error('Add/Update product failed', err);
+                alert('Failed: ' + err.message); // Show specific error
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Add product';
+                submitBtn.textContent = 'Add product'; // Reset button text
             }
         });
     }
@@ -254,8 +283,8 @@
             const item = document.createElement('div');
             item.className = 'admin-item'; // Reuse existing style
             item.innerHTML = `
-                {/* Add image if category DTO includes it */}
-                {<img src="${escapeHtml(cat.imageUrl || 'images/placeholder2.jpg')}" alt="${escapeHtml(cat.categoryName)}" /> }
+               
+                <img src="${escapeHtml(cat.imageUrl || 'images/placeholder2.jpg')}" alt="${escapeHtml(cat.categoryName)}" /> 
                 <div class="meta">
                   <div style="font-weight:700">${escapeHtml(cat.categoryName)}</div>
                   <div style="color:#777; font-size: .8em">ID: ${cat.categoryId}, Slug: ${escapeHtml(cat.slug || '')}</div>

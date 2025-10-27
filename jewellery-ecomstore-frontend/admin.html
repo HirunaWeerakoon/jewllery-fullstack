@@ -102,16 +102,39 @@
             <label>Title</label>
             <input id="prod-title" required />
 
-            <label>Price</label>
-            <input id="prod-price" type="number" required />
+            <label>Base Price (LKR)</label>
+            <input id="prod-price" type="number" step="0.01" required placeholder="Price before gold/markup" />
+
+            <label>Markup (%)</label>
+            <input id="prod-markup" type="number" step="0.01" required placeholder="e.g., 10 for 10%" />
 
             <label>Description</label>
             <textarea id="prod-desc" rows="3"></textarea>
+
+            <fieldset style="border: 1px solid #eee; padding: 10px; border-radius: 6px; margin-top: 10px;">
+                <legend>Gold Properties (Optional)</legend>
+                <div style="margin-bottom: 10px;">
+                    <input type="checkbox" id="prod-is-gold" style="width: auto; margin-right: 5px;">
+                    <label for="prod-is-gold" style="display: inline;">Is Gold Item?</label>
+                </div>
+                <div id="gold-fields" style="display: none;">
+                    <label>Gold Weight (grams)</label>
+                    <input id="prod-gold-weight" type="number" step="0.0001" placeholder="e.g., 12.5"/>
+
+                    <label style="margin-top: 8px;">Gold Purity (Karat)</label>
+                    <input id="prod-gold-purity" type="number" step="1" placeholder="e.g., 18, 22, 24"/>
+                </div>
+            </fieldset>
 
             <label>Category</label>
             <select id="prod-category">
                 <option value="">Uncategorized</option>
             </select>
+
+            <label>SKU</label>
+            <input id="prod-sku" />
+            <label>Stock Quantity</label>
+            <input id="prod-stock" type="number" />
 
             <label>Image URL</label>
             <input id="prod-image" placeholder="images/..." />
@@ -180,6 +203,16 @@
                 window.renderPaymentSlips();
         });
     });
+</script>
+<script>
+    const isGoldCheckbox = document.getElementById('prod-is-gold');
+    const goldFieldsDiv = document.getElementById('gold-fields');
+    if (isGoldCheckbox && goldFieldsDiv) {
+        isGoldCheckbox.addEventListener('change', () => {
+            // This line makes the div visible when checkbox is checked
+            goldFieldsDiv.style.display = isGoldCheckbox.checked ? 'block' : 'none';
+        });
+    }
 </script>
 </body>
 </html>
