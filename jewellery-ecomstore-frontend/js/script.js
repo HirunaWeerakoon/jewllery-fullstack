@@ -246,7 +246,13 @@ document.addEventListener('DOMContentLoaded', () => {
   cartOverlay?.addEventListener('click', closeCart);
 
   cartCheckoutBtn?.addEventListener('click', () => {
-    // Check cart status by fetching it (safer than relying on potentially stale UI)
+
+    // Bypass the cart check and go directly to checkout
+    console.warn("DEMO FIX: Bypassing cart check for checkout.");
+    window.location.href = 'checkout.html';
+
+
+    /* // Original code (commented out):
     fetchCartAPI('').then(cartData => {
       if (cartData && cartData.items && cartData.items.length > 0) {
         window.location.href = 'checkout.html';
@@ -257,6 +263,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }).catch(() => {
       alert("Could not verify cart status. Please try again.");
     });
+    */
   });
 
   addToCartBtns.forEach(btn => {

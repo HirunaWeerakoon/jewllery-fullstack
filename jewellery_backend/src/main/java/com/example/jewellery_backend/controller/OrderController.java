@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/orders") // Base path remains /orders
+@RequestMapping("/api/orders") // Base path remains /orders
 public class OrderController {
 
     private final OrderService orderService;

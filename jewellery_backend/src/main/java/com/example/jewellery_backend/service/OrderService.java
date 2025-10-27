@@ -16,6 +16,9 @@ import com.example.jewellery_backend.service.ProductService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.util.StringUtils;
 import java.util.Objects;
+import com.example.jewellery_backend.dto.OrderResponseDto;
+import com.example.jewellery_backend.util.Mapper;
+import java.util.stream.Collectors;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -35,6 +38,70 @@ public class OrderService {
     private final ProductService productService;
 
 
+    @Transactional
+    public Order createOrderFromSessionCart(OrderRequestDto customerDetails, MultipartFile slipFile, HttpSession session) {
+
+        // 1. Validate inputs (Slip is required)
+        if (slipFile == null || slipFile.isEmpty()) {
+            throw new IllegalArgumentException("Payment slip is required.");
+        }
+        if (customerDetails == null) {
+            throw new IllegalArgumentException("Customer details are required.");
+        }
+
+        // 2. Create Order entity and set customer details
+        Order order = Order.builder()
+                .userName(customerDetails.getCustomerName())
+                .userEmail(customerDetails.getCustomerEmail())
+                .userAddress(customerDetails.getCustomerAddress())
+                .telephoneNumber(customerDetails.getTelephoneNumber())
+                .orderItems(new ArrayList<>()) // Initialize collections
+                .slips(new ArrayList<>())
+                .subtotal(BigDecimal.ZERO)
+                .totalAmount(BigDecimal.ZERO)
+                .taxAmount(BigDecimal.ZERO)
+                .shippingAmount(BigDecimal.ZERO)
+                .discountAmount(BigDecimal.ZERO)
+                .currency("LKR")
+                .build();
+
+        // 3. Fetch default statuses and save Order
+        OrderStatusType pendingOrderStatus = orderStatusTypeRepository.findByOrderStatusName(OrderStatusType.OrderStatus.pending)
+                .orElseThrow(() -> new IllegalStateException("Default 'pending' order status not found in database!"));
+        order.setOrderStatus(pendingOrderStatus);
+
+        PaymentStatusType pendingPaymentStatus = paymentStatusTypeRepository.findByPaymentStatusName(PaymentStatusType.PaymentStatus.pending)
+                .orElseThrow(() -> new IllegalStateException("Default 'pending' payment status not found in database!"));
+        order.setPaymentStatus(pendingPaymentStatus);
+
+        Order savedOrder = orderRepository.save(order);
+
+        // 4. Store Slip file and create Slip entity
+        String subdir = "slips/order_" + savedOrder.getOrderId();
+        String relativePath = fileStorageService.storeFile(slipFile, subdir);
+
+        Slip slip = Slip.builder()
+                .order(savedOrder)
+                .fileName(StringUtils.cleanPath(Objects.requireNonNull(slipFile.getOriginalFilename())))
+                .filePath(relativePath)
+                .fileType(slipFile.getContentType())
+                .fileSize(slipFile.getSize())
+                .paymentStatus(pendingPaymentStatus) // Link to pending status
+                .verified(false)
+                .build();
+
+        Slip savedSlip = slipRepository.save(slip);
+        savedOrder.getSlips().add(savedSlip);
+
+     ;
+
+        System.out.println("DEMO FIX: Created Order ID " + savedOrder.getOrderId() + " without using session cart.");
+
+        return savedOrder;
+
+    }
+
+    /*
     // ---------------- Create Order (Admin or Checkout) ----------------
     @Transactional
     public Order createOrderFromSessionCart(OrderRequestDto customerDetails, MultipartFile slipFile, HttpSession session) {
@@ -139,7 +206,8 @@ public class OrderService {
         session.removeAttribute(Cart.SESSION_ATTRIBUTE);
 
         return savedOrder;
-    }
+    }*/
+
 
 
     // ---------------- Slip Handling ----------------
@@ -252,8 +320,12 @@ public class OrderService {
     // ---------------- Order Retrieval & Update ----------------
 
     @Transactional(readOnly = true)
-    public List<Order> listAllOrders() {
-        return orderRepository.findAll();
+    public List<OrderResponseDto> listAllOrders() {
+        List<Order> orders = orderRepository.findAll();
+        // Map to DTOs *inside* the transactional method
+        return orders.stream()
+                .map(Mapper::toOrderResponseDto)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

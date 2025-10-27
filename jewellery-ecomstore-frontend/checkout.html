@@ -99,7 +99,8 @@
                     // Make sure API_BASE_URL is defined in config.js
                     const response = await fetch(`${API_BASE_URL}/orders`, {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        credentials: 'include'
                         // DO NOT set Content-Type header manually for FormData
                     });
 
