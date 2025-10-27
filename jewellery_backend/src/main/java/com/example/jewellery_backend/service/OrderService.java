@@ -20,6 +20,7 @@ import com.example.jewellery_backend.dto.OrderResponseDto;
 import com.example.jewellery_backend.util.Mapper;
 import java.util.stream.Collectors;
 
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -40,8 +41,10 @@ public class OrderService {
 
     @Transactional
     public Order createOrderFromSessionCart(OrderRequestDto customerDetails, MultipartFile slipFile, HttpSession session) {
+        // Bypasses session cart due to persistence issues. Creates order with details + slip only.
+        // We assume the statuses 'pending' exist in the database from previous SQL fixes.
 
-        // 1. Validate inputs (Slip is required)
+        // 1. Validate inputs
         if (slipFile == null || slipFile.isEmpty()) {
             throw new IllegalArgumentException("Payment slip is required.");
         }
@@ -55,8 +58,9 @@ public class OrderService {
                 .userEmail(customerDetails.getCustomerEmail())
                 .userAddress(customerDetails.getCustomerAddress())
                 .telephoneNumber(customerDetails.getTelephoneNumber())
-                .orderItems(new ArrayList<>()) // Initialize collections
+                .orderItems(new ArrayList<>()) // Initialize as empty list
                 .slips(new ArrayList<>())
+                // Set dummy totals since we are skipping the cart
                 .subtotal(BigDecimal.ZERO)
                 .totalAmount(BigDecimal.ZERO)
                 .taxAmount(BigDecimal.ZERO)
@@ -67,14 +71,14 @@ public class OrderService {
 
         // 3. Fetch default statuses and save Order
         OrderStatusType pendingOrderStatus = orderStatusTypeRepository.findByOrderStatusName(OrderStatusType.OrderStatus.pending)
-                .orElseThrow(() -> new IllegalStateException("Default 'pending' order status not found in database!"));
+                .orElseThrow(() -> new IllegalStateException("Default 'pending' order status not found in database! Please run SQL to add it."));
         order.setOrderStatus(pendingOrderStatus);
 
         PaymentStatusType pendingPaymentStatus = paymentStatusTypeRepository.findByPaymentStatusName(PaymentStatusType.PaymentStatus.pending)
-                .orElseThrow(() -> new IllegalStateException("Default 'pending' payment status not found in database!"));
+                .orElseThrow(() -> new IllegalStateException("Default 'pending' payment status not found in database! Please run SQL to add it."));
         order.setPaymentStatus(pendingPaymentStatus);
 
-        Order savedOrder = orderRepository.save(order);
+        Order savedOrder = orderRepository.save(order); // Save Order first
 
         // 4. Store Slip file and create Slip entity
         String subdir = "slips/order_" + savedOrder.getOrderId();
@@ -91,14 +95,11 @@ public class OrderService {
                 .build();
 
         Slip savedSlip = slipRepository.save(slip);
-        savedOrder.getSlips().add(savedSlip);
-
-     ;
+        savedOrder.getSlips().add(savedSlip); // Link slip back to order
 
         System.out.println("DEMO FIX: Created Order ID " + savedOrder.getOrderId() + " without using session cart.");
 
         return savedOrder;
-
     }
 
     /*

@@ -5,6 +5,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.example.jewellery_backend.entity.Order;
 import com.example.jewellery_backend.entity.OrderStatusType;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.lang.NonNull;
+import java.util.List;
 
 import java.util.List;
 

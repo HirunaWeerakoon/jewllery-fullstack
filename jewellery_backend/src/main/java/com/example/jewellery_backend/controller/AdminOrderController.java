@@ -5,12 +5,15 @@ import com.example.jewellery_backend.dto.UpdateStatusDto;
 import com.example.jewellery_backend.entity.Order;
 import com.example.jewellery_backend.entity.OrderStatusType;
 import com.example.jewellery_backend.service.OrderService;
+import com.example.jewellery_backend.util.Mapper;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 @RestController
@@ -28,20 +31,30 @@ public class AdminOrderController {
     public ResponseEntity<List<OrderResponseDto>> listOrders(
             @RequestParam(value = "status", required = false) String statusStr) {
 
-        List<OrderResponseDto> dtos;
+        // Fetch all order DTOs from the service
+        List<OrderResponseDto> dtos = orderService.listAllOrders();
 
-        if (statusStr != null && !statusStr.isBlank()) {
-            // Filter by order status
-            OrderStatusType.OrderStatus statusEnum = OrderStatusType.OrderStatus.valueOf(statusStr);
-            dtos = orderService.listAllOrders().stream() // Get DTO list from service
-                    .filter(o -> o.getOrderStatusType() != null &&
-                            o.getOrderStatusType().getOrderStatusName() == statusEnum)
-                    .collect(Collectors.toList());
-        } else {
-            dtos = orderService.listAllOrders(); // Get DTO list directly
+        // If no status filter, return all
+        if (statusStr == null || statusStr.isBlank()) {
+            return ResponseEntity.ok(dtos);
         }
 
-        return ResponseEntity.ok(dtos);
+        // Parse enum in a case-insensitive way
+        final OrderStatusType.OrderStatus statusEnum;
+        try {
+            statusEnum = OrderStatusType.OrderStatus.valueOf(statusStr.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            // Invalid status supplied -> 400 Bad Request
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
+
+        // Filter by status
+        List<OrderResponseDto> filtered = dtos.stream()
+                .filter(o -> o.getOrderStatusType() != null
+                        && statusEnum.equals(o.getOrderStatusType().getOrderStatusName()))
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(filtered);
     }
 
     @GetMapping("/{id}")
